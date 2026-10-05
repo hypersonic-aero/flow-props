@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StationsConfig(BaseModel):
-    """Station selection: exactly one mode must be active."""
+    """Station selection: no mode means all stations; otherwise choose one."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -36,14 +36,8 @@ class StationsConfig(BaseModel):
         mode2 = any(v is not None for v in [self.i_s, self.i_e, self.di])
         mode3 = self.list is not None
         active = sum([mode1, mode2, mode3])
-        if active == 0:
-            raise ValueError(
-                "stations: specify one of: x_s/x_e/dx, i_s/i_e/di, or list"
-            )
         if active > 1:
-            raise ValueError(
-                "stations: only one selection mode is allowed at a time"
-            )
+            raise ValueError("stations: only one selection mode is allowed at a time")
         return self
 
 
@@ -66,17 +60,19 @@ class BLConfig(BaseModel):
         default="bl_properties.dat",
         description="Output Tecplot ASCII file path",
     )
+    profiles_output: str | None = Field(
+        default=None,
+        description="Optional Tecplot ASCII output for extracted wall-normal profiles",
+    )
 
 
 class GasConfig(BaseModel):
-    """Gas properties for integral calculations."""
+    """Optional gas-property overrides for calculations that require them."""
 
     model_config = ConfigDict(extra="forbid")
 
-    gamma: float = Field(default=1.4, gt=1.0, description="Specific heat ratio")
-    gas_constant: float = Field(
-        default=287.05, gt=0.0, description="Gas constant [J/(kg K)]"
-    )
+    gamma: float | None = Field(default=None, gt=1.0, description="Specific heat ratio")
+    gas_constant: float | None = Field(default=None, gt=0.0, description="Gas constant [J/(kg K)]")
 
 
 class FlowPropsConfig(BaseModel):

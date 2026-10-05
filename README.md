@@ -15,15 +15,31 @@ Python tool suite to extract flow properties from CFD data, such as boundary lay
 pip install flow-props
 ```
 
-## Quick Start
+To upgrade an existing installation:
 
-```python
-import flow_props
+```bash
+pip install --upgrade flow-props
 ```
 
-## Features
+## Quick Start
 
-- under construction
+```bash
+flow-props init --bl
+flow-props run --bl
+```
+
+## Documentation
+
+Full documentation: https://uahypersonics.github.io/flow-props
+
+## Testing
+
+Run the ruff check and pytest check in the project root:
+
+```bash
+ruff check
+pytest --cov
+```
 
 ## Documentation
 

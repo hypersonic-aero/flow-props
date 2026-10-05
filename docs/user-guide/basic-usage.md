@@ -17,7 +17,7 @@ For split solution/grid formats, provide the separate grid file through `cfd-io`
 ```python
 from flow_props import extract_profiles
 
-profiles = extract_profiles(dataset, stations=[10, 50, 100], j_max=80)
+profiles = extract_profiles(dataset, stations=[10, 50, 100])
 print(profiles[0].keys())
 ```
 
@@ -26,6 +26,19 @@ Each extracted profile includes:
 - `x`, `y`
 - `eta`
 - one array per flow field available in the input dataset
+
+For config-driven extraction, `flow-props init --bl` creates `bl.toml`. Set
+`fname` to a structured HDF5 file, then run `flow-props run
+--bl`. With `profiles_output` configured, the extracted wall-normal profiles
+are written as multi-zone Tecplot ASCII alongside the BL property table.
+`cfd-io` handles file reading; `flow-props` does not convert CFD formats.
+Leave `[stations]` empty to process all i-indices from 0 through `Nx - 1` with
+step 1, or choose one station-selection mode to limit the run.
+
+Only the `htot_derivative` criterion requires gas constants. The tool reads
+`gamma` and `r_gas` from HDF5 attributes, fills missing values from an adjacent
+`flow_conditions.json`, and allows optional `[gas]` overrides. The default
+`velocity_ratio` criterion does not require those values.
 
 ## Compute Boundary-Layer Properties
 

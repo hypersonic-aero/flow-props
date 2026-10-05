@@ -6,6 +6,8 @@ import typer
 from cfd_io.dataset import Dataset, Field, StructuredGrid
 
 from flow_props.cli.common import resolve_station_list
+from flow_props.pipeline import _resolve_stations
+from flow_props.schema import StationsConfig
 
 # common.resolve_station_list raises typer.Exit; catch that exact class
 Exit = typer.Exit
@@ -24,6 +26,22 @@ def _make_dataset(ni: int = 8, nj: int = 4) -> Dataset:
     grid = StructuredGrid(x=x, y=y, z=z)
     flow = {"uvel": Field(data=np.zeros((ni, nj, 1)), association="node")}
     return Dataset(grid=grid, flow=flow, attrs={"format": "test"})
+
+
+def test_pipeline_empty_station_selection_uses_all_grid_indices():
+    ds = _make_dataset(ni=8)
+
+    stations = _resolve_stations(ds, StationsConfig())
+
+    assert stations == list(range(8))
+
+
+def test_pipeline_explicit_station_range_still_limits_selection():
+    ds = _make_dataset(ni=8)
+
+    stations = _resolve_stations(ds, StationsConfig(i_s=2, i_e=6, di=2))
+
+    assert stations == [2, 4, 6]
 
 
 def test_resolve_station_list_explicit_values():

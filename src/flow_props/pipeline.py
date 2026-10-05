@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,7 +40,7 @@ def run_pipeline(cfg, config_dir: Path, mode: str = "all") -> PipelineResult:
     Returns:
         PipelineResult with output path and result table.
     """
-    from flow_props.output import write_bl_properties
+    from flow_props.output import write_bl_properties, write_profiles_output
     from flow_props.profiles import extract_profiles
 
     # -- resolve file paths relative to config directory --
@@ -56,9 +58,14 @@ def run_pipeline(cfg, config_dir: Path, mode: str = "all") -> PipelineResult:
 
     # -- extract wall-normal profiles --
     profiles = extract_profiles(ds, stations, method="grid_line")
+    if cfg.bl.profiles_output:
+        write_profiles_output(config_dir / cfg.bl.profiles_output, profiles, stations)
 
     # -- compute BL properties per station --
-    table = _compute_bl_table(profiles, cfg.bl, cfg.gas)
+    gamma, gas_constant = _resolve_gas_properties(
+        cfg.gas, ds.attrs, fname, required=cfg.bl.criterion == "htot_derivative"
+    )
+    table = _compute_bl_table(profiles, cfg.bl, gamma, gas_constant)
 
     # -- write output --
     output_path = config_dir / cfg.bl.output
@@ -71,6 +78,51 @@ def run_pipeline(cfg, config_dir: Path, mode: str = "all") -> PipelineResult:
 # --------------------------------------------------
 # helpers
 # --------------------------------------------------
+
+
+def _resolve_gas_properties(
+    gas_cfg, attrs: dict, fname: Path, *, required: bool
+) -> tuple[float, float]:
+    """Resolve gas constants for criteria that need total enthalpy."""
+    if not required:
+        return 1.4, 287.05
+
+    # read HDF5 attributes first; the sibling flow-conditions file fills gaps
+    values = {
+        "gamma": _metadata_number(attrs.get("gamma")),
+        "gas_constant": _metadata_number(attrs.get("r_gas")),
+    }
+    conditions_path = fname.parent / "flow_conditions.json"
+    if None in values.values() and conditions_path.is_file():
+        with conditions_path.open(encoding="utf-8") as stream:
+            conditions = json.load(stream)
+        for key, source_key in (("gamma", "gamma"), ("gas_constant", "r_gas")):
+            if values[key] is None:
+                values[key] = _metadata_number(conditions.get(source_key))
+
+    gamma = gas_cfg.gamma if gas_cfg.gamma is not None else values["gamma"]
+    gas_constant = (
+        gas_cfg.gas_constant if gas_cfg.gas_constant is not None else values["gas_constant"]
+    )
+    if gamma is None or gas_constant is None:
+        raise ValueError(
+            "htot_derivative requires gamma and r_gas in HDF5 attributes or "
+            "flow_conditions.json, or explicit [gas] overrides"
+        )
+    if gamma <= 1.0 or gas_constant <= 0.0:
+        raise ValueError("gamma must exceed 1 and gas constant must be positive")
+    return gamma, gas_constant
+
+
+def _metadata_number(value: object) -> float | None:
+    """Read a scalar or unit-tagged value from cfd-io attributes or JSON."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = ast.literal_eval(value)
+    if isinstance(value, (list, tuple)):
+        value = value[0]
+    return float(value)
 
 
 def _load_dataset(fname: Path, gname: Path | None) -> Dataset:
@@ -127,7 +179,11 @@ def _resolve_stations(ds: Dataset, stations_cfg) -> list[int]:
         return _resolve_i_range(ni, stations_cfg.i_s, stations_cfg.i_e, stations_cfg.di)
 
     # mode 1: x-range along the wall surface
-    return _resolve_x_range(ds, stations_cfg.x_s, stations_cfg.x_e, stations_cfg.dx)
+    if stations_cfg.x_s is not None or stations_cfg.x_e is not None or stations_cfg.dx is not None:
+        return _resolve_x_range(ds, stations_cfg.x_s, stations_cfg.x_e, stations_cfg.dx)
+
+    # without an explicit selection, process every streamwise grid station
+    return list(range(ni))
 
 
 def _validate_indices(ni: int, indices: list[int]) -> list[int]:
@@ -159,7 +215,9 @@ def _resolve_i_range(ni: int, i_s: int | None, i_e: int | None, di: int | None) 
     return stations
 
 
-def _resolve_x_range(ds: Dataset, x_s: float | None, x_e: float | None, dx: float | None) -> list[int]:
+def _resolve_x_range(
+    ds: Dataset, x_s: float | None, x_e: float | None, dx: float | None
+) -> list[int]:
     """Map a wall x-range to the nearest i-station indices along the wall line."""
     # require both endpoints
     if x_s is None or x_e is None:
@@ -205,13 +263,16 @@ def _build_targets(x_s: float, x_e: float, dx: float) -> list[float]:
     return targets
 
 
-def _compute_bl_table(profiles: list[dict[str, np.ndarray]], bl_cfg, gas_cfg) -> dict[str, np.ndarray]:
+def _compute_bl_table(
+    profiles: list[dict[str, np.ndarray]], bl_cfg, gamma: float, gas_constant: float
+) -> dict[str, np.ndarray]:
     """Compute the per-station BL property table.
 
     Args:
         profiles: Extracted wall-normal profiles in station order.
         bl_cfg: Validated BLConfig instance.
-        gas_cfg: Validated GasConfig instance.
+        gamma: Heat capacity ratio for the enthalpy criterion.
+        gas_constant: Specific gas constant for the enthalpy criterion.
 
     Returns:
         Dict mapping each output column name to a 1-D array over stations.
@@ -261,8 +322,8 @@ def _compute_bl_table(profiles: list[dict[str, np.ndarray]], bl_cfg, gas_cfg) ->
             threshold=bl_cfg.threshold,
             u_edge=u_edge,
             temp=temp,
-            gamma=gas_cfg.gamma,
-            gas_constant=gas_cfg.gas_constant,
+            gamma=gamma,
+            gas_constant=gas_constant,
         )
 
         # integrate integral thicknesses across the boundary layer only (0 to delta);
