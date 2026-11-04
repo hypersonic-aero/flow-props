@@ -147,7 +147,7 @@ def cmd_init(
 
     # check target path
     if dest.exists() and not force:
-        typer.echo(f"Error: {dest} already exists. Use --force to overwrite.", err=True)
+        typer.echo(f"error: {dest} already exists. Use --force to overwrite.", err=True)
         raise typer.Exit(code=1)
 
     # write template

@@ -24,7 +24,7 @@ def write_full_config(config_path: Path, force: bool) -> None:
     # validate inputs
     if config_path.exists() and not force:
         typer.echo(
-            f"Error: config file already exists: {config_path}. Use --force to overwrite.",
+            f"error: config file already exists: {config_path}. Use --force to overwrite.",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -62,7 +62,7 @@ def write_config_section(
     if has_section(config_text, section_name):
         if not force:
             typer.echo(
-                f"Error: [{section_name}] already exists in {config_path}. Use --force to overwrite.",
+                f"error: [{section_name}] already exists in {config_path}. Use --force to overwrite.",
                 err=True,
             )
             raise typer.Exit(code=1)

@@ -38,7 +38,7 @@ def cmd_examples(
     except KeyError:
         valid = ", ".join(ex.name for ex in available_examples())
         typer.echo(
-            f"Error: unknown example: {name}  (available: {valid})",
+            f"error: unknown example: {name}  (available: {valid})",
             err=True,
         )
         raise typer.Exit(code=1) from None
@@ -46,10 +46,10 @@ def cmd_examples(
     # refuse to overwrite an existing file
     dest = Path(f"{name}.toml")
     if dest.exists():
-        typer.echo(f"Error: {dest} already exists.", err=True)
+        typer.echo(f"error: {dest} already exists.", err=True)
         raise typer.Exit(code=1)
 
     # write the example config
     dest.write_text(text, encoding="utf-8")
     typer.echo(f"Written {dest}")
-    typer.echo(f"Run with:  flow-props run {dest}")
+    typer.echo(f"Run with:  flow-props run -c {dest}")

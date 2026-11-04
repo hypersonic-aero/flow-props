@@ -13,8 +13,10 @@ def cmd_run(
         "--bl",
         help="Run BL extraction only; default config is bl.toml.",
     ),
-    config: Path | None = typer.Argument(
+    config: Path | None = typer.Option(
         None,
+        "--config",
+        "-c",
         help="Path to TOML config file.  Defaults to bl.toml (--bl) or flow_props.toml.",
     ),
 ) -> None:
@@ -36,7 +38,7 @@ def cmd_run(
     if not config_path.is_file():
         hint = "--bl " if bl else ""
         typer.echo(
-            f"Error: config file not found: {config_path}  "
+            f"error: config file not found: {config_path}  "
             f"(hint: run 'flow-props init {hint}' to create it)",
             err=True,
         )

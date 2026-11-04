@@ -95,7 +95,7 @@ def test_run_missing_default_config_reports_not_found(tmp_path, monkeypatch):
 
 def test_run_bl_missing_explicit_config_reports_not_found(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    result = runner.invoke(app, ["run", "--bl", "nonexistent.toml"])
+    result = runner.invoke(app, ["run", "--bl", "-c", "nonexistent.toml"])
     assert result.exit_code != 0
     assert "not found" in result.output
 
@@ -121,7 +121,7 @@ def test_run_bl_writes_extracted_profiles(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    result = runner.invoke(app, ["run", "--bl", str(config_path)])
+    result = runner.invoke(app, ["run", "--bl", "-c", str(config_path)])
 
     assert result.exit_code == 0, result.output
     assert (tmp_path / "properties.dat").is_file()
