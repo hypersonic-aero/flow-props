@@ -3,9 +3,10 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 from cfd_io.dataset import Dataset, Field, StructuredGrid
 
-from flow_props.output import write_profiles_output, write_station_output
+from flow_props.output import write_profiles_output, write_station_output, write_tecplot_table
 
 
 def _make_station_dataset(ni: int = 4, nj: int = 6) -> Dataset:
@@ -70,3 +71,20 @@ def test_write_station_output_dat(tmp_path: Path):
     assert 'TITLE = "flow-props boundary layer"' in text
     assert 'VARIABLES = "x", "y", "z", "station", "delta", "theta"' in text
     assert 'ZONE T="boundary-layer", I=2, J=1, K=1, F=POINT' in text
+
+
+def test_write_tecplot_table_dat(tmp_path: Path):
+    """One I-ordered zone, columns in dict order (x, y first for a line in the plane)."""
+    columns = {"x": np.array([0.0, 1.0]), "y": np.array([0.5, 0.6]), "j": np.array([3.2, 3.4])}
+
+    output_path = write_tecplot_table(tmp_path / "shock.dat", columns, title="t", zone_title="z")
+
+    lines = output_path.read_text().splitlines()
+    assert lines[1] == 'VARIABLES = "x", "y", "j"'
+    assert lines[2] == 'ZONE T = "z", I = 2, F = POINT'
+    np.testing.assert_allclose(np.loadtxt(lines[3:]), np.column_stack(list(columns.values())))
+
+    with pytest.raises(ValueError, match="rows"):
+        write_tecplot_table(
+            tmp_path / "bad.dat", {"x": np.zeros(2), "y": np.zeros(3)}, title="t", zone_title="z"
+        )

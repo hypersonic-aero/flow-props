@@ -74,6 +74,54 @@ def write_bl_properties(table: dict[str, np.ndarray], output_path: str | Path) -
     return output_path
 
 
+def write_tecplot_table(
+    output_path: str | Path,
+    columns: dict[str, np.ndarray],
+    *,
+    title: str,
+    zone_title: str,
+) -> Path:
+    """Write columns of equal length as one I-ordered Tecplot ASCII zone.
+
+    The columns are written in dict order; name the first two "x" and "y" and Tecplot
+    plots the rows as a line in the (x, y) plane, e.g. over a loaded flow field.
+
+    Args:
+        output_path: Output file path (``.dat``).
+        columns: Column name -> 1-D array, all of the same length.
+        title: Tecplot TITLE string.
+        zone_title: Tecplot zone title.
+
+    Returns:
+        Path to the created file.
+
+    Raises:
+        ValueError: If the suffix is unsupported or the columns differ in length.
+    """
+    # convert to Path object and validate suffix
+    output_path = Path(output_path)
+    detect_output_format(output_path)
+
+    # validate: one length for every column
+    arrays = [np.asarray(values, dtype=float) for values in columns.values()]
+    n_rows = arrays[0].size
+    for name, values in zip(columns, arrays):
+        if values.size != n_rows:
+            raise ValueError(f"column {name} has {values.size} rows, expected {n_rows}")
+
+    # write Tecplot header and one data row per entry
+    with open(output_path, "w") as fobj:
+        fobj.write(f'TITLE = "{title}"\n')
+        variable_text = ", ".join(f'"{name}"' for name in columns)
+        fobj.write(f"VARIABLES = {variable_text}\n")
+        fobj.write(f'ZONE T = "{zone_title}", I = {n_rows}, F = POINT\n')
+        for row_index in range(n_rows):
+            row = " ".join(f"{values[row_index]:.10E}" for values in arrays)
+            fobj.write(row + "\n")
+
+    return output_path
+
+
 def write_profiles_output(
     output_path: str | Path,
     profiles: list[dict[str, np.ndarray]],
@@ -165,7 +213,9 @@ def detect_output_format(output_path: str | Path) -> str:
     if suffix == ".dat":
         return OUTPUT_FORMAT_TECPLOT_ASCII
     if suffix == ".plt":
-        raise ValueError("Tecplot binary output is not implemented yet. Use .dat for Tecplot ASCII.")
+        raise ValueError(
+            "Tecplot binary output is not implemented yet. Use .dat for Tecplot ASCII."
+        )
 
     raise ValueError(f"unsupported output suffix: {suffix}. Use .dat for Tecplot ASCII.")
 

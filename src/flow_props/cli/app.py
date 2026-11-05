@@ -1,48 +1,61 @@
-"""CLI app for flow-props."""
+"""Root application for the flow-props CLI."""
 
+# --------------------------------------------------
+# load necessary modules
+# --------------------------------------------------
 from __future__ import annotations
 
-from importlib.metadata import version as _pkg_version
+from typing import Annotated
 
 import typer
 
-from flow_props.cli.cmd_examples import cmd_examples
-from flow_props.cli.cmd_init import cmd_init
-from flow_props.cli.cmd_run import cmd_run
+from flow_props.calculators import CALCULATORS
+from flow_props.cli.callbacks import verbose_callback, version_callback
+from flow_props.cli.cmd_calculator import build_calculator_app
 
-__version__ = _pkg_version("flow-props")
-
-
-def _version_callback(value: bool) -> None:
-    """Print version and exit."""
-    if value:
-        typer.echo(f"flow-props {__version__}")
-        raise typer.Exit()
-
-
+# --------------------------------------------------
+# root application
+# --------------------------------------------------
 app = typer.Typer(
     name="flow-props",
-    help="Extract boundary-layer properties from CFD data.",
+    help="flow field analysis from CFD data.",
     no_args_is_help=True,
     add_completion=False,
 )
 
 
+# --------------------------------------------------
+# register callbacks
+# --------------------------------------------------
 @app.callback()
-def _main(
-    version: bool = typer.Option(
-        False,
-        "--version",
-        "-V",
-        callback=_version_callback,
-        is_eager=True,
-        help="Show version and exit.",
-    ),
+def main(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            callback=version_callback,
+            is_eager=True,
+            help="Show version and exit.",
+        ),
+    ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            callback=verbose_callback,
+            help="Enable verbose (debug) output.",
+        ),
+    ] = False,
 ) -> None:
-    """flow-props: boundary-layer and entropy-layer extraction from CFD data."""
-    del version
+    """Flow field analysis from CFD data: one command group per calculation."""
+
+    del version, verbose
 
 
-app.command("init")(cmd_init)
-app.command("run")(cmd_run)
-app.command("examples")(cmd_examples)
+# --------------------------------------------------
+# register subcommands: one command group per calculation (bl, entropy-layer, profiles, shock)
+# --------------------------------------------------
+for calculator_name in CALCULATORS:
+    app.add_typer(build_calculator_app(calculator_name), name=calculator_name)

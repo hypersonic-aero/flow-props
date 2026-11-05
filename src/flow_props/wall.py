@@ -5,18 +5,6 @@ from __future__ import annotations
 import numpy as np
 from cfd_io.dataset import Dataset, StructuredGrid
 
-TEMPLATE = """\
-[wall]
-mu_wall = 1.0e-5                # dynamic viscosity at wall [Pa\u00b7s]
-k_wall = 0.0                    # thermal conductivity at wall [W/(m\u00b7K)] (0 = skip heat flux)
-rho_inf = 0.0                   # freestream density [kg/m\u00b3] (0 = skip Cf)
-u_inf = 0.0                     # freestream velocity [m/s]
-cp = 1005.0                     # specific heat [J/(kg\u00b7K)]
-T_wall = 300.0                  # wall temperature [K]
-T_inf = 300.0                   # freestream temperature [K]
-output = "wall.dat"             # output file (.dat or .json)
-"""
-
 
 def wall_shear_stress(
     ds: Dataset,

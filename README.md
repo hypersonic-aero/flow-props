@@ -1,6 +1,6 @@
 # flow-props
 
-Python tool suite to extract flow properties from CFD data, such as boundary layer thickness and entropy layer thickness.
+Python tool suite to extract flow properties from CFD data, such as boundary layer thickness, entropy layer thickness and the shock.
 
 [![Test](https://github.com/uahypersonics/flow-props/actions/workflows/test.yml/badge.svg)](https://github.com/uahypersonics/flow-props/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/flow-props)](https://pypi.org/project/flow-props/)
@@ -23,10 +23,16 @@ pip install --upgrade flow-props
 
 ## Quick Start
 
+Every calculation is a command group (`bl`, `entropy-layer`, `profiles`, `shock`):
+
 ```bash
-flow-props init --bl
-flow-props run --bl
+flow-props bl init     # writes bl.toml, every key documented
+flow-props bl run      # reads bl.toml
+flow-props shock init  # shock curve of a solution (for grid-generator's [shock] curve)
+flow-props shock run
 ```
+
+`flow-props -v <calculation> run` adds debug output.
 
 ## Documentation
 

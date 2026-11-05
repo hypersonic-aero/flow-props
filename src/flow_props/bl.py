@@ -16,32 +16,6 @@ BL_EDGE_HTOT_DERIVATIVE = "htot_derivative"
 
 
 # --------------------------------------------------
-# public configuration template
-# --------------------------------------------------
-
-TEMPLATE = """\
-[bl]
-method = "grid_line"          # grid_line | wall_normal_interp
-
-# station selection: inclusive i-index range with positive step
-i_s = 10
-i_e = 100
-di = 10
-
-n_eta = 0                       # samples for wall_normal_interp (0 = use full grid-line count)
-eta_max = 0.0                   # max wall-normal distance for wall_normal_interp (0 = use full grid-line extent)
-u_edge = 0.0                    # edge velocity [m/s] (auto-detect if 0)
-rho_edge = 0.0                  # edge density [kg/m^3] (auto-detect if 0)
-criterion = "velocity_ratio"    # velocity_ratio | enthalpy_ratio | velocity_gradient
-threshold = 0.99                # threshold for ratio-based criteria
-gradient_threshold = 0.0        # du/deta threshold for velocity_gradient
-gamma = 1.4                     # specific heat ratio
-gas_constant = 287.05           # gas constant [J/(kg*K)]
-output = "bl.dat"               # output file (.dat)
-"""
-
-
-# --------------------------------------------------
 # public API
 # --------------------------------------------------
 

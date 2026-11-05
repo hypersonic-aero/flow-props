@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "flow-props"
 dynamic = ["version"]
-description = "Extract flow properties from CFD data: boundary layer thickness, entropy layer thickness"
+description = "Extract flow properties from CFD data: boundary layer, entropy layer, shock"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
@@ -23,7 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Physics",
 ]
-keywords = ["boundary-layer", "entropy-layer", "cfd", "flow-properties", "aerodynamics"]
+keywords = ["boundary-layer", "entropy-layer", "shock", "cfd", "flow-properties", "aerodynamics"]
 
 dependencies = [
     "numpy>=1.24.0",
@@ -51,7 +51,8 @@ Repository = "https://github.com/uahypersonics/flow-props"
 where = ["src"]
 
 [tool.setuptools.package-data]
-flow_props = ["examples/*.toml"]
+# bundled example cases: examples/<calculation>/<name>/<files>
+flow_props = ["examples/*/*/*"]
 
 [tool.setuptools_scm]
 

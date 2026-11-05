@@ -13,40 +13,6 @@ ENTROPY_LAYER_WALL_FRACTION = "wall_fraction"
 
 
 # --------------------------------------------------
-# public configuration template
-# --------------------------------------------------
-
-TEMPLATE = """\
-[entropy]
-method = "grid_line"          # grid_line | wall_normal_interp
-
-# station selection: pick exactly ONE of the three modes below
-# mode 1 (default): wall x-coordinate range (inclusive start/end, positive step)
-x_s = 0.05
-x_e = 0.50
-dx = 0.05
-
-# mode 2: i-index range (inclusive start/end, positive step)
-# i_s = 10
-# i_e = 100
-# di = 10
-
-# mode 3: explicit list of i-station indices
-# stations = [10, 50, 100]
-
-n_eta = 0                       # samples for wall_normal_interp (0 = use full grid-line count)
-eta_max = 0.0                   # max wall-normal distance for wall_normal_interp (0 = use full grid-line extent)
-criterion = "wall_fraction"     # wall_fraction
-threshold = 0.25                # normalized entropy threshold
-gamma = 1.4                     # specific heat ratio
-gas_constant = 287.05           # gas constant [J/(kg*K)]
-temp_edge = 0.0                 # edge temperature [K] (0 = auto-detect)
-pressure_edge = 0.0             # edge pressure [Pa] (0 = auto-detect)
-output = "entropy.dat"         # output file (.dat or .json)
-"""
-
-
-# --------------------------------------------------
 # public API
 # --------------------------------------------------
 

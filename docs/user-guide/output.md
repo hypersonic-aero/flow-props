@@ -1,48 +1,37 @@
 # Output Formats
 
-The current CLI writes JSON outputs for easy inspection and scripting.
+Tables are written as Tecplot ASCII (`.dat`), one row per station; the shock curve is a
+CSV.
 
-## Profiles Output
+## bl
 
-`flow-props profiles` writes a list of profile dictionaries.
+`bl_properties.dat`: one row per station with
 
-Each item contains:
+- `x` (wall), `delta`, `delta_star`, `theta`, `H`
+- `uvel_edge`, `temp_edge`, `dens_edge`, `mach_edge`, `twte` (wall-to-edge temperature ratio)
 
-- `x`
-- `y`
-- `eta`
-- one array for each available flow variable
+## entropy-layer
 
-## Boundary-Layer Output
+`entropy_layer.dat`: the wall point `x`, `y`, `z` of each station, `station` and
+`delta_entropy`.
 
-`flow-props bl` writes one object per station with:
+## profiles
 
-- `station`
-- `delta`
-- `delta_star`
-- `theta`
-- `H`
+`profiles.dat`: one Tecplot zone per station with `x`, `y`, `z`, `eta`, `station` and one
+column per flow variable of the solution (plus `u_tangent` and `u_normal`, the velocity
+in the local wall frame).
 
-## Entropy-Layer Output
+## shock
 
-`flow-props entropy` writes one object per station with:
-
-- `station`
-- `delta_entropy`
-
-## Wall Output
-
-`flow-props wall` writes a dictionary of surface arrays. Depending on the inputs you provide, it may contain:
-
-- `tau_w`
-- `cf`
-- `qw`
-- `st`
-
-## Post-Processing Strategy
-
-These JSON outputs are intended to be lightweight interchange products. They are easy to:
-
-- inspect directly
-- read into Python for plotting
-- archive with the CFD case inputs
+- `shock_cfd.csv`: `x,y` header, then one shock point per grid line (smoothed, unless
+  `smoothing_length = 0`). This is the file grid-generator's `[shock] curve` reads.
+- `shock_report.dat`: the shock location for Tecplot, one I-ordered zone with one row per
+  grid line with a shock. `x`, `y` are the shock points as found, so loading the file
+  over the flow field draws the shock; then the wall point `x_wall`, `y_wall`, `station`,
+  the shock point's fractional grid index `j_shock`, the `distance` from the wall along
+  the grid line, the captured `thickness_cells`, and,
+  when a shock line is known, `offset_cells` (`j_shock - shock_line_j`; positive means the
+  solution's shock lies outside the grid's shock line). With smoothing, also the smoothed
+  point `x_smooth`, `y_smooth`, `j_smooth` and how far it moved, `smoothing_cells`. With
+  `method = "hybrid"`, `detected_by` says which detector found the line's shock (1: walk,
+  2: indicator, 3: both).

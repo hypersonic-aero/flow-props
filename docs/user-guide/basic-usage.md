@@ -27,10 +27,10 @@ Each extracted profile includes:
 - `eta`
 - one array per flow field available in the input dataset
 
-For config-driven extraction, `flow-props init --bl` creates `bl.toml`. Set
-`fname` to a structured HDF5 file, then run `flow-props run
---bl`. With `profiles_output` configured, the extracted wall-normal profiles
-are written as multi-zone Tecplot ASCII alongside the BL property table.
+For config-driven extraction, `flow-props bl init` creates `bl.toml`. Set
+`fname` to a structured HDF5 file, then run `flow-props bl run`. To look at the
+profiles behind the table, `flow-props profiles init` / `run` writes them, for the
+same stations, as multi-zone Tecplot ASCII.
 `cfd-io` handles file reading; `flow-props` does not convert CFD formats.
 Leave `[stations]` empty to process all i-indices from 0 through `Nx - 1` with
 step 1, or choose one station-selection mode to limit the run.
@@ -70,6 +70,18 @@ entropy_results = run_entropy(
     threshold=0.25,
 )
 ```
+
+## Extract the Shock
+
+```python
+from flow_props import extract_shock, write_shock_curve
+
+extraction = extract_shock(dataset, quantity="pressure", level=0.5)
+write_shock_curve("shock_cfd.csv", extraction)
+```
+
+`extraction.j` holds the fractional grid index of the shock on each line, for comparing
+with a shock-line grid's shock line.
 
 ## Compute Wall Quantities
 

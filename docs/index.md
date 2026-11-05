@@ -1,6 +1,6 @@
 # flow_props
 
-`flow_props` extracts physically meaningful boundary-layer and wall quantities from structured CFD datasets.
+`flow_props` extracts physically meaningful boundary-layer, entropy-layer and shock quantities from structured CFD datasets.
 
 ## Quick Start
 
@@ -15,8 +15,8 @@ pip install flow-props
 === "CLI"
 
 	```bash
-	flow-props init --bl
-	flow-props run --bl
+	flow-props bl init
+	flow-props bl run
 	```
 
 === "API"

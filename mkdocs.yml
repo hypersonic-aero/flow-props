@@ -109,6 +109,7 @@ nav:
     - theory/index.md
     - Boundary-Layer Quantities: theory/boundary-layer.md
     - Entropy Layer: theory/entropy-layer.md
+    - Shock Extraction: theory/shock.md
     - Wall Quantities: theory/wall-quantities.md
   - CLI Reference:
     - cli-reference/index.md
@@ -118,6 +119,7 @@ nav:
     - Profiles: api/profiles.md
     - Boundary Layer: api/boundary-layer.md
     - Entropy Layer: api/entropy-layer.md
+    - Shock: api/shock.md
     - Wall Quantities: api/wall.md
   - Validation and Verification:
     - vnv/index.md
