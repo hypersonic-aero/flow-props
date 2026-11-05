@@ -17,6 +17,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from flow_props.calculators.common import (
+    AT_CELL_CENTRES,
     INPUT_BLOCK,
     STATIONS_BLOCK,
     CaseConfig,
@@ -25,6 +26,7 @@ from flow_props.calculators.common import (
     input_paths,
     load_dataset,
     resolve_stations,
+    solution_points,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,9 +110,10 @@ def run_case(cfg: ProfilesCaseConfig, config_dir: Path) -> list[str]:
     from flow_props.output import write_profiles_output
     from flow_props.profiles import extract_profiles
 
-    # resolve file paths relative to the config directory, then load the dataset
+    # resolve file paths relative to the config directory, then load the dataset (cell
+    # values go on a grid of the cell centres)
     fname, gname = input_paths(cfg, config_dir)
-    ds = load_dataset(fname, gname)
+    ds, location = solution_points(load_dataset(fname, gname))
 
     # resolve the stations
     stations = resolve_stations(ds, cfg.stations)
@@ -133,5 +136,12 @@ def run_case(cfg: ProfilesCaseConfig, config_dir: Path) -> list[str]:
         f"Profiles at {len(stations)} stations ({options.method})",
         f"Wrote: {output_path}",
     ]
+
+    if location == AT_CELL_CENTRES:
+        report.insert(
+            1,
+            "  solution at cell centres: profiles run through them, from the first cell "
+            "centre (half a cell off the wall)",
+        )
 
     return report

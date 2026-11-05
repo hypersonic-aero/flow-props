@@ -10,6 +10,9 @@ finds the shock on every wall-normal grid line (see flow_props.shock) and writes
   with per line the wall point, distance from the wall, captured thickness in cells and,
   on a shock-line grid, the offset from the grid line meant to hold the shock.
 
+A solution with cell values is taken along the lines through the cell centres, whose j
+counts cells; the offsets from shock_line_j (a vertex index) use j + 0.5 for them.
+
 Detection (``method``): walk (the first rise of min_rise over freestream, from outside),
 indicator (the first point whose WENO smoothness indicator reaches indicator_threshold)
 or hybrid (the outermost jump either finds); the point is where the quantity crosses
@@ -29,11 +32,13 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from flow_props.calculators.common import (
+    AT_CELL_CENTRES,
     INPUT_BLOCK,
     CaseConfig,
     build_template,
     input_paths,
     load_dataset,
+    solution_points,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +49,14 @@ logger = logging.getLogger(__name__)
 
 # within a quarter cell of its grid line, the shock counts as sitting on it
 ALIGNED_OFFSET_CELLS = 0.25
+
+# fewer cells than this between the shock's outer edge and the outer boundary leave too
+# little freestream to read q_inf from, or mean a disturbance ahead of the shock was
+# taken for it (e.g. freestream compressed against a bent symmetry line)
+OUTER_EDGE_CELLS = 5
+
+# walk and indicator farther apart than this found different things on a line
+DISAGREEMENT_CELLS = 3.0
 
 # --------------------------------------------------
 # config models (input boundary)
@@ -206,10 +219,14 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
         write_shock_curve,
     )
 
-    # resolve file paths relative to the config directory, then load the dataset
+    # resolve file paths relative to the config directory, then load the dataset (cell
+    # values go on a grid of the cell centres)
     fname, gname = input_paths(cfg, config_dir)
-    ds = load_dataset(fname, gname)
+    ds, location = solution_points(load_dataset(fname, gname))
     options = cfg.shock
+
+    # j on the grid the shock line counts (the vertex grid): cell j lies at j + 0.5
+    j_to_vertex = 0.5 if location == AT_CELL_CENTRES else 0.0
 
     # extract: one shock point per grid line
     extraction = extract_shock(
@@ -222,7 +239,8 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
         indicator_threshold=options.indicator_threshold,
     )
     ni = ds.grid.shape[0]
-    nj = ds.grid.shape[1]
+    nj_vertices = ds.grid.shape[1] + (1 if location == AT_CELL_CENTRES else 0)
+    j_shock = extraction.j + j_to_vertex
 
     # the grid line meant to hold the shock: config first, then the solution's attributes
     shock_line_j = options.shock_line_j
@@ -230,8 +248,10 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
     if shock_line_j is None and ds.attrs.get("shock_line_j") is not None:
         shock_line_j = int(ds.attrs["shock_line_j"])
         source = "the solution file"
-    if shock_line_j is not None and shock_line_j >= nj:
-        raise ValueError(f"shock_line_j = {shock_line_j} lies outside the grid (j = 0 to {nj - 1})")
+    if shock_line_j is not None and shock_line_j >= nj_vertices:
+        raise ValueError(
+            f"shock_line_j = {shock_line_j} lies outside the grid (j = 0 to {nj_vertices - 1})"
+        )
 
     # debug output for devs
     logger.debug("shock line: %s (from %s)", shock_line_j, source)
@@ -244,7 +264,8 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
         "x_wall": ds.grid.x[extraction.station, 0, 0],
         "y_wall": ds.grid.y[extraction.station, 0, 0],
         "station": extraction.station.astype(float),
-        "j_shock": extraction.j,
+        "j_shock": j_shock,
+        "j_foot": extraction.j_foot + j_to_vertex,
         "distance": extraction.distance,
         "thickness_cells": extraction.thickness_cells,
     }
@@ -254,7 +275,7 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
     offsets = None
     if shock_line_j is not None:
         # positive: the solution's shock lies outside the grid's shock line
-        offsets = extraction.j - shock_line_j
+        offsets = j_shock - shock_line_j
         table["offset_cells"] = offsets
 
     # smooth: the curve that is written becomes a grid line
@@ -265,7 +286,7 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
         moved = curve.j - extraction.j
         table["x_smooth"] = curve.x
         table["y_smooth"] = curve.y
-        table["j_smooth"] = curve.j
+        table["j_smooth"] = curve.j + j_to_vertex
         table["smoothing_cells"] = moved
 
     # write: the curve, then the report
@@ -298,6 +319,11 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
             f"  found by the walk on {by_walk} lines, by the indicator on {by_indicator} "
             f"(both on {both})"
         )
+    if location == AT_CELL_CENTRES:
+        report.append(
+            "  solution at cell centres: lines run through them, j is counted on the vertex "
+            "grid (cell j + 0.5)"
+        )
     if extraction.stations_without_shock:
         report.append(f"  no shock on i = {_index_ranges(extraction.stations_without_shock)}")
     thickness = extraction.thickness_cells
@@ -306,7 +332,43 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
         f"{thickness.max():.1f} cells (median {np.median(thickness):.1f})"
     )
 
+    # warn: the shock's outer edge close to the outer boundary
+    nj = ds.grid.shape[1]
+    cells_outside = (nj - 1) - extraction.j_foot
+    near_outer = extraction.station[cells_outside < OUTER_EDGE_CELLS].tolist()
+    if near_outer:
+        report.append(
+            f"  warning: the shock lies within {OUTER_EDGE_CELLS} cells of the outer boundary "
+            f"on {len(near_outer)} lines (i = {_index_ranges(near_outer)}): too little "
+            "freestream outside it, or a disturbance ahead of the shock was taken for it"
+        )
+
+    # warn: walk and indicator found different jumps (both run on every line)
+    both_found = ~np.isnan(extraction.j_walk) & ~np.isnan(extraction.j_indicator)
+    gap = np.abs(extraction.j_walk - extraction.j_indicator)
+    apart = both_found & (gap > DISAGREEMENT_CELLS)
+    if np.any(apart):
+        walk_outside = int(np.count_nonzero(apart & (extraction.j_walk > extraction.j_indicator)))
+        apart_lines = extraction.station[apart].tolist()
+        report.append(
+            f"  warning: walk and indicator differ by more than {DISAGREEMENT_CELLS:g} cells "
+            f"on {len(apart_lines)} lines (i = {_index_ranges(apart_lines)}); the walk's "
+            f"shock lies farther out on {walk_outside} of them"
+        )
+
+    # report: the shock's outer edge, row by row (row changes along the body make the
+    # captured shock jump between cells, which a solver feels at the wall)
+    edge_j = extraction.j_foot + j_to_vertex
+    edge_row = np.floor(edge_j).astype(int)
+    row_changes = int(np.count_nonzero(np.diff(edge_row)))
+    edge_text = f"  shock edge (10 % of the jump): grid row changes along the body {row_changes}"
+
     # report: how the shock sits on the grid's shock line
+    if shock_line_j is not None:
+        outside = edge_j > shock_line_j
+        crossings = int(np.count_nonzero(np.diff(outside.astype(int))))
+        edge_text += f", crossings of the shock line {crossings}"
+    report.append(edge_text)
     if offsets is None:
         report.append("  no shock line to compare with (set [shock] shock_line_j)")
     else:

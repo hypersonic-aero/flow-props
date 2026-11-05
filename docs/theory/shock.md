@@ -65,6 +65,41 @@ On a shock-line grid the shock is meant to lie on grid line `shock_line_j`. The 
 gives each line's offset $j_\text{shock} - j_s$ in cells, and the run summary the range of
 offsets and the number of lines more than a quarter cell off.
 
+## Checks in the Report
+
+Both detectors run on every line, whichever the method, so each result can be checked
+against the other. The run summary warns when
+
+- the shock's outer edge (where $q$ crosses 10 % of the jump) lies within 5 cells of the
+  outer boundary: too little freestream outside it to read $q_\infty$ from, or a
+  disturbance ahead of the shock was taken for it;
+- the walk and the indicator differ by more than 3 cells on a line: one of them found
+  something else. A smooth compression ahead of the shock (e.g. freestream compressed
+  against a bent symmetry line) is met first by the walk, while the indicator, which
+  only flags sharp jumps, finds the shock.
+
+It also counts how often the shock's outer edge changes grid row along the body and, on
+a shock-line grid, how often it crosses the shock line `shock_line_j`. A captured shock
+that moves between rows makes a solver's wall quantities wave; on a converged
+shock-line grid the edge stays on one side of the shock line.
+
+## Solutions at Cell Centres
+
+A finite-volume solution holds cell values. Read through cfd-io as fields at the cell
+centres of the vertex grid (association `cell`: one point fewer than the grid in each
+direction), they are put on a grid of the cell centres, each the mean of its cell's
+corners, and the shock is found along the lines through them. Those lines lie half a
+cell from the vertex grid's lines, so:
+
+- the shock line `shock_line_j` counts vertices, and cell $j$ lies at $j + 0.5$ on the
+  vertex grid; the report's `j_shock` and the offsets use that, and the run summary
+  says the solution was at cell centres;
+- the first line runs half a cell off the symmetry axis, so the curve starts there;
+  grid-generator continues a curve that starts slightly off the axis to it.
+
+A solution whose grid is the cell centres themselves (stored as an ordinary grid)
+can't be told from vertex data; write cell values on the vertex grid instead.
+
 ## Smoothing the Curve
 
 The extracted curve becomes a grid line of the next grid, so line-to-line jitter of the

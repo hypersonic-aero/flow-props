@@ -18,6 +18,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from flow_props.calculators.common import (
+    AT_CELL_CENTRES,
     GAS_BLOCK,
     INPUT_BLOCK,
     STATIONS_BLOCK,
@@ -29,6 +30,7 @@ from flow_props.calculators.common import (
     load_dataset,
     resolve_gas_properties,
     resolve_stations,
+    solution_points,
 )
 
 logger = logging.getLogger(__name__)
@@ -109,8 +111,8 @@ def run_case(cfg: BLCaseConfig, config_dir: Path) -> list[str]:
     # -- resolve file paths relative to config directory --
     fname, gname = input_paths(cfg, config_dir)
 
-    # -- load CFD dataset via cfd_io --
-    ds = load_dataset(fname, gname)
+    # -- load CFD dataset via cfd_io (cell values go on a grid of the cell centres) --
+    ds, location = solution_points(load_dataset(fname, gname))
 
     # -- resolve station list --
     stations = resolve_stations(ds, cfg.stations)
@@ -143,6 +145,13 @@ def run_case(cfg: BLCaseConfig, config_dir: Path) -> list[str]:
         f"Boundary layer at {len(stations)} stations ({cfg.bl.criterion} edge criterion)",
         f"Wrote: {output_path}",
     ]
+
+    if location == AT_CELL_CENTRES:
+        report.insert(
+            1,
+            "  solution at cell centres: profiles run through them, from the first cell "
+            "centre (half a cell off the wall)",
+        )
 
     return report
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 from cfd_io.dataset import Dataset, StructuredGrid
-from synthetic import shock_solution
+from synthetic import shock_behind_a_bump, shock_solution
 
 from flow_props.calculators.shock import _index_ranges
 from flow_props.shock import (
@@ -114,6 +114,26 @@ def test_no_shock_on_a_line_without_a_jump():
     """A line inside the shock layer (or in uniform flow) has no shock."""
     assert find_shock_on_line(np.full(50, 3.0)) is None
     assert find_shock_on_line(np.linspace(1.04, 1.0, 50)) is None
+
+
+def test_each_detector_reports_its_own_point():
+    """Whatever the method, the crossing carries the walk's and the indicator's points."""
+    crossing = find_shock_on_line(_captured_shock(1.0, 4.0), method="walk")
+    assert crossing.j_walk == crossing.j
+    assert crossing.j_indicator == pytest.approx(crossing.j, abs=1e-12)
+    assert crossing.j < crossing.j_foot < crossing.j + 3.0
+
+    weak = find_shock_on_line(_captured_shock(4.0, 0.3), method="walk")
+    assert np.isnan(weak.j_indicator)
+
+
+def test_walk_and_indicator_part_ways_at_a_disturbance_ahead_of_the_shock():
+    """The walk takes the compression for the shock; the indicator finds the real one."""
+    crossing = find_shock_on_line(shock_behind_a_bump(), method="walk")
+
+    assert crossing.j > 70.0
+    assert abs(crossing.j_indicator - 40.3) < TOLERANCE_CELLS
+    assert crossing.j_walk - crossing.j_indicator > 30.0
 
 
 def test_a_smooth_compression_is_not_a_shock():
@@ -273,6 +293,9 @@ def _with_distance(dataset, extraction: ShockExtraction, distance: np.ndarray) -
         distance=distance,
         thickness_cells=extraction.thickness_cells,
         detected_by=extraction.detected_by,
+        j_foot=extraction.j_foot,
+        j_walk=extraction.j_walk,
+        j_indicator=extraction.j_indicator,
         stations_without_shock=[],
     )
 
@@ -305,6 +328,9 @@ def test_smoothing_keeps_a_straight_shock_over_lines_that_turn_at_a_junction():
         distance=distance,
         thickness_cells=np.full(ni, 2.0),
         detected_by=np.full(ni, DETECTED_BY_WALK),
+        j_foot=distance / (2.0 * height) * (nj - 1) + 1.0,
+        j_walk=distance / (2.0 * height) * (nj - 1),
+        j_indicator=np.full(ni, np.nan),
         stations_without_shock=[],
     )
 

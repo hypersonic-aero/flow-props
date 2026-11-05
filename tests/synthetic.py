@@ -103,3 +103,17 @@ def shock_solution(ni: int = 21, nj: int = 81, width: float = 1.0) -> tuple[Data
     dataset = Dataset(grid=StructuredGrid(x=x, y=y, z=np.zeros_like(x)), flow=flow, attrs={})
 
     return dataset, j_true
+
+
+def shock_behind_a_bump(nj: int = 81) -> np.ndarray:
+    """A strong, sharp shock at j = 40.3, and a smooth 18 % compression near the outer end.
+
+    Like the freestream compressed against a bent symmetry line ahead of the shock: the
+    walk meets the compression first; the indicator, which only flags sharp jumps,
+    doesn't see it and finds the shock.
+    """
+    j = np.arange(nj, dtype=float)
+    shock = 20.0 * 0.5 * (1.0 - np.tanh((j - 40.3) / 0.8))
+    bump = 0.18 * 0.5 * (1.0 - np.tanh((j - 75.0) / 2.5))
+    values = 1.0 + shock + bump
+    return values

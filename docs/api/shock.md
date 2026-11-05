@@ -11,7 +11,8 @@ writes the shock curve (see [Shock Extraction](../theory/shock.md) for the metho
 
 - `find_shock_on_line(values, level=0.5, min_rise=0.05, max_thickness=20.0, method="walk",
   indicator_threshold=0.0025)`: the shock on one line, as a `ShockCrossing` (fractional
-  `j`, `j_tail`, `j_foot`, `thickness_cells`, `detected_by`), or `None`
+  `j`, `j_tail`, the outer edge `j_foot`, `thickness_cells`, `detected_by`, and each
+  detector's own point `j_walk`, `j_indicator`, whatever the method), or `None`
 - `extract_shock(ds, quantity="pressure", ..., method="walk", indicator_threshold=0.0025)`:
   every line of a dataset, as a `ShockExtraction` (station, x, y, j, distance,
   thickness_cells, detected_by, and the stations without a shock)

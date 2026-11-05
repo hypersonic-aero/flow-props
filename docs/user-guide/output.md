@@ -28,7 +28,8 @@ in the local wall frame).
 - `shock_report.dat`: the shock location for Tecplot, one I-ordered zone with one row per
   grid line with a shock. `x`, `y` are the shock points as found, so loading the file
   over the flow field draws the shock; then the wall point `x_wall`, `y_wall`, `station`,
-  the shock point's fractional grid index `j_shock`, the `distance` from the wall along
+  the shock point's fractional grid index `j_shock`, its outer edge `j_foot` (where the
+  quantity crosses 10 % of the jump), the `distance` from the wall along
   the grid line, the captured `thickness_cells`, and,
   when a shock line is known, `offset_cells` (`j_shock - shock_line_j`; positive means the
   solution's shock lies outside the grid's shock line). With smoothing, also the smoothed

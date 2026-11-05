@@ -21,12 +21,18 @@ from typing import TypeVar
 
 import numpy as np
 from cfd_io.dataset import Dataset, StructuredGrid
+from cfd_io.dataset import Field as FlowField
+from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 logger = logging.getLogger(__name__)
 
 # any calculation's config model (load_config returns the model it is given)
 ConfigModel = TypeVar("ConfigModel", bound=BaseModel)
+
+# where a solution's fields sit (see solution_points)
+AT_VERTICES = "vertices"
+AT_CELL_CENTRES = "cell centres"
 
 # --------------------------------------------------
 # config models (input boundary)
@@ -230,6 +236,60 @@ def load_dataset(fname: Path, gname: Path | None) -> Dataset:
     return read_file(fname)
 
 
+def solution_points(ds: Dataset) -> tuple[Dataset, str]:
+    """The dataset whose grid points carry the flow fields, and where those points are.
+
+    Fields at the grid points (cfd-io association "node", e.g. SU2's vertex data) are
+    used as they are. Fields at the cell centres ("cell": a finite-volume solution's
+    cell values on its vertex grid, e.g. Eilmer's) are put on a grid of the cell
+    centres, each the mean of its cell's corners. That grid's lines run through the
+    cell centres, so a profile starts at the first cell centre (half a cell off the
+    wall), and its j counts cells: cell j lies at j + 0.5 on the vertex grid.
+
+    Args:
+        ds: Dataset as read by cfd-io.
+
+    Returns:
+        The dataset to take profiles from, and AT_VERTICES or AT_CELL_CENTRES.
+
+    Raises:
+        ValueError: If the fields sit at different places (some at the grid points,
+            some at the cell centres), or the cell fields don't fit the grid.
+    """
+
+    # where the fields sit
+    associations = {field.association for field in ds.flow.values()}
+    if not associations or associations == {"node"}:
+        return ds, AT_VERTICES
+    if associations != {"cell"}:
+        places = ", ".join(sorted(associations))
+        raise ValueError(
+            f"the solution's fields sit at different places ({places}); flow-props needs "
+            "them all at the grid points or all at the cell centres"
+        )
+
+    # the cell-centre grid: each centre the mean of its cell's corners
+    centre_x = _cell_centres(np.asarray(ds.grid.x, dtype=float))
+    centre_y = _cell_centres(np.asarray(ds.grid.y, dtype=float))
+    centre_z = _cell_centres(np.asarray(ds.grid.z, dtype=float))
+    grid = StructuredGrid(x=centre_x, y=centre_y, z=centre_z)
+
+    # the cell values, now at the points of that grid
+    flow: dict[str, FlowField] = {}
+    for name, field in ds.flow.items():
+        if field.data.shape != centre_x.shape:
+            raise ValueError(
+                f"cell field {name} has shape {field.data.shape}; the grid's cells are "
+                f"{centre_x.shape}"
+            )
+        flow[name] = FlowField(data=field.data, association="node")
+
+    # debug output for devs
+    logger.debug("solution at cell centres: profiles on a %s grid of cell centres", grid.shape)
+
+    return Dataset(grid=grid, flow=flow, attrs=ds.attrs), AT_CELL_CENTRES
+
+
 def input_paths(config: CaseConfig, config_dir: Path) -> tuple[Path, Path | None]:
     """Resolve the solution and grid file paths relative to the config file's folder.
 
@@ -343,6 +403,21 @@ def resolve_gas_properties(
 # --------------------------------------------------
 # helpers
 # --------------------------------------------------
+
+
+def _cell_centres(corners: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Cell centres of a structured (ni, nj, nk) array: the mean of each cell's corners.
+
+    A 2D grid (nk = 1) keeps its single k-plane.
+    """
+
+    # average neighbours along i, then j, then k (if the grid has cells in k)
+    centres = 0.5 * (corners[:-1, :, :] + corners[1:, :, :])
+    centres = 0.5 * (centres[:, :-1, :] + centres[:, 1:, :])
+    if centres.shape[2] > 1:
+        centres = 0.5 * (centres[:, :, :-1] + centres[:, :, 1:])
+
+    return centres
 
 
 def _metadata_number(value: object) -> float | None:

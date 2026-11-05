@@ -6,7 +6,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 from cfd_io import write_file
-from synthetic import boundary_layer_solution, shock_solution
+from cfd_io.dataset import Dataset, Field
+from synthetic import boundary_layer_solution, shock_behind_a_bump, shock_solution
 from typer.testing import CliRunner
 
 from flow_props.calculators import CALCULATORS
@@ -243,6 +244,100 @@ def test_shock_run_names_its_method(method, tmp_path):
         assert '"detected_by"' in report_text
     else:
         assert '"detected_by"' not in report_text
+
+
+def _analytic_shock(at_cells: bool, shock_j: float = 50.3) -> Dataset:
+    """The same captured shock (at vertex index shock_j) at the vertices or the cell centres.
+
+    The vertex grid is the synthetic solution's; at the cell centres, the pressure is the
+    same function evaluated at cell index j + 0.5, as a finite-volume solution holds it.
+    """
+    vertex_dataset, _ = shock_solution(width=1.5)
+    grid = vertex_dataset.grid
+    ni, nj, _ = grid.shape
+
+    # pressure as a function of the vertex index: a captured jump centred at shock_j
+    def pressure(j_vertex: np.ndarray) -> np.ndarray:
+        shape = 0.5 * (1.0 - np.tanh((j_vertex - shock_j) / 1.5))
+        return 1000.0 * (1.0 + 4.0 * shape)
+
+    # at the vertices, or at the cell centres (one fewer per direction)
+    if at_cells:
+        j_index = np.arange(nj - 1, dtype=float) + 0.5
+        values = np.broadcast_to(pressure(j_index)[None, :, None], (ni - 1, nj - 1, 1)).copy()
+        flow = {"pres": Field(data=values, association="cell")}
+    else:
+        j_index = np.arange(nj, dtype=float)
+        values = np.broadcast_to(pressure(j_index)[None, :, None], (ni, nj, 1)).copy()
+        flow = {"pres": Field(data=values, association="node")}
+
+    return Dataset(grid=grid, flow=flow, attrs={})
+
+
+def test_shock_offsets_agree_on_vertex_and_cell_centre_input(tmp_path, monkeypatch):
+    """Cell j counts on the vertex grid as j + 0.5, so both inputs give the same offsets."""
+    offsets = {}
+    outputs = {}
+    for label, at_cells in (("vertices", False), ("cells", True)):
+        dataset = _analytic_shock(at_cells)
+        monkeypatch.setattr(
+            "flow_props.calculators.shock.load_dataset", lambda fname, gname, ds=dataset: ds
+        )
+        folder = tmp_path / label
+        folder.mkdir()
+        path = _write_config(folder, "shock", "[shock]\nshock_line_j = 52\n")
+
+        result = runner.invoke(app, ["shock", "run", "-c", str(path)])
+
+        assert result.exit_code == 0, result.output
+        outputs[label] = result.output
+        lines = (folder / "shock_report.dat").read_text().splitlines()
+        variables = [name.strip('" ') for name in lines[1].split("=")[1].split(",")]
+        rows = np.loadtxt(lines[3:], ndmin=2)
+        offsets[label] = rows[:, variables.index("offset_cells")]
+
+    # check: the true offset is 50.3 - 52 on every line, from either input
+    np.testing.assert_allclose(offsets["vertices"], -1.7, atol=0.05)
+    np.testing.assert_allclose(offsets["cells"], -1.7, atol=0.05)
+    assert abs(np.mean(offsets["cells"]) - np.mean(offsets["vertices"])) < 0.05
+
+    # check: the report says which was used
+    assert "solution at cell centres" in outputs["cells"]
+    assert "solution at cell centres" not in outputs["vertices"]
+
+
+def test_shock_run_warns_about_a_disturbance_ahead_of_the_shock(tmp_path, monkeypatch):
+    """A compression near the outer boundary: both warnings name the lines."""
+    # every line: the shock at j = 40.3, a smooth compression near the outer end
+    dataset, _ = shock_solution()
+    ni, nj, _ = dataset.grid.shape
+    values = 1000.0 * shock_behind_a_bump(nj)
+    dataset.flow["pres"].data[:] = values[None, :, None]
+    monkeypatch.setattr("flow_props.calculators.shock.load_dataset", lambda fname, gname: dataset)
+    path = _write_config(tmp_path, "shock", "")
+
+    result = runner.invoke(app, ["shock", "run", "-c", str(path)])
+
+    assert result.exit_code == 0, result.output
+    assert (
+        f"warning: the shock lies within 5 cells of the outer boundary on {ni} lines"
+        in result.output
+    )
+    assert f"warning: walk and indicator differ by more than 3 cells on {ni} lines" in result.output
+    assert f"the walk's shock lies farther out on {ni} of them" in result.output
+
+
+def test_shock_run_counts_row_changes_of_the_shock_edge(tmp_path):
+    """The synthetic shock climbs 10 cells along the body; it crosses j = 55 once."""
+    dataset, _ = shock_solution()
+    _write_solution(tmp_path, dataset)
+    path = _write_config(tmp_path, "shock", "[shock]\nshock_line_j = 55\n")
+
+    result = runner.invoke(app, ["shock", "run", "-c", str(path)])
+
+    assert result.exit_code == 0, result.output
+    assert "grid row changes along the body 10, crossings of the shock line 1" in result.output
+    assert "warning" not in result.output
 
 
 def test_shock_run_reads_the_shock_line_from_the_solution_attributes(tmp_path):

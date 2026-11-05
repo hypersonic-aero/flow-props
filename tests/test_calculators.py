@@ -9,11 +9,14 @@ from cfd_io.dataset import Dataset, Field, StructuredGrid
 
 from flow_props.calculators import CALCULATORS
 from flow_props.calculators.common import (
+    AT_CELL_CENTRES,
+    AT_VERTICES,
     GasConfig,
     StationsConfig,
     load_config,
     resolve_gas_properties,
     resolve_stations,
+    solution_points,
 )
 from flow_props.cli.examples_command import list_examples
 
@@ -143,3 +146,39 @@ def test_gas_metadata_missing_names_who_needs_it(tmp_path):
         resolve_gas_properties(
             GasConfig(), {}, tmp_path / "a.h5", required=True, needed_for="the entropy layer"
         )
+
+
+# --------------------------------------------------
+# solutions at the vertices or at the cell centres
+# --------------------------------------------------
+def test_vertex_solution_is_used_as_it_is():
+    ds = _make_dataset()
+
+    points, location = solution_points(ds)
+
+    assert points is ds
+    assert location == AT_VERTICES
+
+
+def test_cell_solution_moves_to_a_grid_of_cell_centres():
+    """Cell values on a vertex grid: the grid becomes the cell centres (corner means)."""
+    ds = _make_dataset(ni=8, nj=4)
+    cell_values = np.arange(7 * 3, dtype=float).reshape(7, 3, 1)
+    ds.flow = {"pres": Field(data=cell_values, association="cell")}
+
+    points, location = solution_points(ds)
+
+    assert location == AT_CELL_CENTRES
+    assert points.grid.shape == (7, 3, 1)
+    np.testing.assert_allclose(points.grid.x[:, 0, 0], 0.1 * (np.arange(7) + 0.5))
+    np.testing.assert_allclose(points.grid.y[0, :, 0], 0.01 * (np.arange(3) + 0.5))
+    np.testing.assert_array_equal(points.flow["pres"].data, cell_values)
+    assert points.flow["pres"].association == "node"
+
+
+def test_fields_in_different_places_are_refused():
+    ds = _make_dataset(ni=8, nj=4)
+    ds.flow["pres"] = Field(data=np.zeros((7, 3, 1)), association="cell")
+
+    with pytest.raises(ValueError, match="different places"):
+        solution_points(ds)

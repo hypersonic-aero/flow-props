@@ -16,6 +16,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from flow_props.calculators.common import (
+    AT_CELL_CENTRES,
     GAS_BLOCK,
     INPUT_BLOCK,
     STATIONS_BLOCK,
@@ -27,6 +28,7 @@ from flow_props.calculators.common import (
     load_dataset,
     resolve_gas_properties,
     resolve_stations,
+    solution_points,
 )
 
 logger = logging.getLogger(__name__)
@@ -115,9 +117,10 @@ def run_case(cfg: EntropyLayerCaseConfig, config_dir: Path) -> list[str]:
     from flow_props.entropy_layer import run_entropy
     from flow_props.output import write_station_output
 
-    # resolve file paths relative to the config directory, then load the dataset
+    # resolve file paths relative to the config directory, then load the dataset (cell
+    # values go on a grid of the cell centres)
     fname, gname = input_paths(cfg, config_dir)
-    ds = load_dataset(fname, gname)
+    ds, location = solution_points(load_dataset(fname, gname))
 
     # resolve the stations and the gas constants (the entropy rise needs both)
     stations = resolve_stations(ds, cfg.stations)
@@ -158,5 +161,12 @@ def run_case(cfg: EntropyLayerCaseConfig, config_dir: Path) -> list[str]:
         "of the wall entropy rise)",
         f"Wrote: {output_path}",
     ]
+
+    if location == AT_CELL_CENTRES:
+        report.insert(
+            1,
+            "  solution at cell centres: profiles run through them, from the first cell "
+            "centre (half a cell off the wall)",
+        )
 
     return report

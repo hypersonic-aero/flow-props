@@ -103,12 +103,16 @@ class ShockCrossing:
     j: float
     # last grid point of the jump on the post-shock side (q there is the post-shock value)
     j_tail: int
-    # first grid point on the freestream side of the jump (outside its 10 % crossing)
-    j_foot: int
+    # the shock's outer edge: fractional j where q crosses 10 % of the jump
+    j_foot: float
     # captured shock thickness: from 10 % to 90 % of the jump, in cells
     thickness_cells: float
     # which detector found it: DETECTED_BY_WALK, DETECTED_BY_INDICATOR, or their sum
     detected_by: int
+    # each detector's own shock point, whatever the method (nan: it found none); a
+    # cross-check: far apart, one of them took something else for the shock
+    j_walk: float = float("nan")
+    j_indicator: float = float("nan")
 
 
 @dataclass(slots=True)
@@ -128,6 +132,11 @@ class ShockExtraction:
     thickness_cells: NDArray[np.float64]
     # which detector found each line's shock (see ShockCrossing.detected_by)
     detected_by: NDArray[np.int64]
+    # the shock's outer edge (10 % of the jump), fractional j
+    j_foot: NDArray[np.float64]
+    # each detector's own shock point, fractional j (nan: it found none on that line)
+    j_walk: NDArray[np.float64]
+    j_indicator: NDArray[np.float64]
     # i of the grid lines without a shock
     stations_without_shock: list[int]
 
@@ -233,13 +242,17 @@ def find_shock_on_line(
     if not q_inf > 0.0:
         raise ValueError(f"the freestream value (outer end of the line) is {q_inf}; expected > 0")
 
-    # each detector of the method: its first jump from outside that is a shock
-    crossings: list[ShockCrossing] = []
-    for detector in METHODS[method]:
+    # every detector: its first jump from outside that is a shock (the method picks
+    # among them; the others are kept as a cross-check)
+    found: dict[str, ShockCrossing] = {}
+    for name, detector in DETECTORS.items():
         detection = detector(values, q_inf, min_rise, indicator_threshold)
         crossing = _first_shock(values, detection, q_inf, level, max_thickness)
         if crossing is not None:
-            crossings.append(crossing)
+            found[name] = crossing
+
+    # the method's detectors
+    crossings = [found[name] for name in METHODS[method] if name in found]
     if not crossings:
         return None
 
@@ -256,6 +269,8 @@ def find_shock_on_line(
         j_foot=outermost.j_foot,
         thickness_cells=outermost.thickness_cells,
         detected_by=detected_by,
+        j_walk=found["walk"].j if "walk" in found else float("nan"),
+        j_indicator=found["indicator"].j if "indicator" in found else float("nan"),
     )
 
     return shock
@@ -322,6 +337,9 @@ def extract_shock(
     distance_values: list[float] = []
     thickness_values: list[float] = []
     detected_values: list[int] = []
+    foot_values: list[float] = []
+    walk_values: list[float] = []
+    indicator_values: list[float] = []
     without_shock: list[int] = []
 
     # find the shock on each line
@@ -354,6 +372,9 @@ def extract_shock(
         distance_values.append(distance)
         thickness_values.append(crossing.thickness_cells)
         detected_values.append(crossing.detected_by)
+        foot_values.append(crossing.j_foot)
+        walk_values.append(crossing.j_walk)
+        indicator_values.append(crossing.j_indicator)
 
     # check: at least one line crosses the shock
     if not found_stations:
@@ -374,6 +395,9 @@ def extract_shock(
         distance=np.asarray(distance_values, dtype=float),
         thickness_cells=np.asarray(thickness_values, dtype=float),
         detected_by=np.asarray(detected_values, dtype=np.int64),
+        j_foot=np.asarray(foot_values, dtype=float),
+        j_walk=np.asarray(walk_values, dtype=float),
+        j_indicator=np.asarray(indicator_values, dtype=float),
         stations_without_shock=without_shock,
     )
 
@@ -484,6 +508,9 @@ def smooth_shock(ds: Dataset, extraction: ShockExtraction, length: float) -> Sho
         distance=smoothed_distance,
         thickness_cells=extraction.thickness_cells.copy(),
         detected_by=extraction.detected_by.copy(),
+        j_foot=extraction.j_foot.copy(),
+        j_walk=extraction.j_walk.copy(),
+        j_indicator=extraction.j_indicator.copy(),
         stations_without_shock=list(extraction.stations_without_shock),
     )
 
@@ -571,10 +598,10 @@ DETECTORS: dict[str, Detector] = {
     "walk": _detect_by_walk,
     "indicator": _detect_by_indicator,
 }
-METHODS: dict[str, tuple[Detector, ...]] = {
-    "walk": (DETECTORS["walk"],),
-    "indicator": (DETECTORS["indicator"],),
-    "hybrid": (DETECTORS["walk"], DETECTORS["indicator"]),
+METHODS: dict[str, tuple[str, ...]] = {
+    "walk": ("walk",),
+    "indicator": ("indicator",),
+    "hybrid": ("walk", "indicator"),
 }
 
 
@@ -643,7 +670,7 @@ def _first_shock(
         crossing = ShockCrossing(
             j=j_shock,
             j_tail=j_tail,
-            j_foot=int(j_outer) + 1,
+            j_foot=j_outer,
             thickness_cells=thickness_cells,
             detected_by=detection.code,
         )

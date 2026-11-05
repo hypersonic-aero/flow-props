@@ -27,6 +27,10 @@ dx  = 0.05
 # Mode 3: list = [10, 50, 100]
 ```
 
+A solution with cell values (a finite-volume solver's, read by cfd-io as fields at the
+cell centres of the vertex grid) is handled by every calculation: the profiles run
+through the cell centres, starting at the first one, half a cell off the wall.
+
 `bl` (with the `htot_derivative` criterion) and `entropy-layer` need $\gamma$ and $R$.
 They come from the solution's HDF5 attributes (`gamma`, `r_gas`), then a
 `flow_conditions.json` next to the solution file, and can be overridden:
