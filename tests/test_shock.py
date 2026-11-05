@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 from cfd_io.dataset import Dataset, StructuredGrid
+from synthetic import shock_solution
 
 from flow_props.calculators.shock import _index_ranges
 from flow_props.shock import (
@@ -15,7 +16,6 @@ from flow_props.shock import (
     smoothness_indicator,
     write_shock_curve,
 )
-from tests.conftest import shock_solution
 
 # true shock position of the synthetic lines (fractional j)
 SHOCK_J = 60.3

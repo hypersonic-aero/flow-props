@@ -6,12 +6,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 from cfd_io import write_file
+from synthetic import boundary_layer_solution, shock_solution
 from typer.testing import CliRunner
 
 from flow_props.calculators import CALCULATORS
 from flow_props.calculators.common import load_config
 from flow_props.cli.app import app
-from tests.conftest import boundary_layer_solution, shock_solution
 
 runner = CliRunner()
 
