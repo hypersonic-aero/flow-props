@@ -281,7 +281,7 @@ def test_shock_report_columns_keep_their_places_whatever_the_options(tmp_path):
         assert result.exit_code == 0, result.output
         variables[label] = _report_variables(tmp_path)
 
-    # check: one fixed layout, the shock-line offset appended when there is a shock line
+    # check: one fixed layout, the offset from the shock line appended when there is one
     fixed = [
         "x", "y", "x_wall", "y_wall", "station", "j_shock", "j_foot", "distance",
         "thickness_cells", "detected_by", "x_smooth", "y_smooth", "j_smooth",

@@ -84,7 +84,7 @@ Each calculation has one table named after it:
 	min_rise = 0.05                # walk: 5 % above freestream marks the shock
 	indicator_threshold = 0.0025   # indicator: (rise per cell / q_inf)^2 on a ramp
 	max_thickness = 20.0           # wider rises are smooth compressions, not shocks
-	# shock_line_j = 160           # shock-line grids: compare with this grid line
+	# shock_line_j = 160           # shock-aligned grids: compare with this grid line
 	smoothing_length = 0.5         # fit length in wall-to-shock distances; 0: as found
 	output = "shock_cfd.csv"
 	report = "shock_report.dat"

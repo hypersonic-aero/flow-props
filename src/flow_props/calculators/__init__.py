@@ -57,7 +57,7 @@ CALCULATORS: dict[str, Calculator] = {
         run=profiles.run_case,
     ),
     "shock": Calculator(
-        help="Shock curve of a solution, and its offset from a shock-line grid's shock line.",
+        help="Shock curve of a solution, and its offset from a shock-aligned grid's shock line.",
         template=shock.TEMPLATE,
         config_model=shock.ShockCaseConfig,
         run=shock.run_case,

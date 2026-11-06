@@ -81,7 +81,7 @@ write_shock_curve("shock_cfd.csv", extraction)
 ```
 
 `extraction.j` holds the fractional grid index of the shock on each line, for comparing
-with a shock-line grid's shock line.
+with a shock-aligned grid's shock line.
 
 ## Compute Wall Quantities
 

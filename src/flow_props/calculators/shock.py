@@ -8,7 +8,7 @@ finds the shock on every wall-normal grid line (see flow_props.shock) and writes
   wall first, unless ``smoothing_length = 0``, since it becomes a grid line);
 - a Tecplot ASCII report whose x, y are the shock points (load it over the flow field),
   with per line the wall point, distance from the wall, captured thickness in cells and,
-  on a shock-line grid, the offset from the grid line meant to hold the shock.
+  on a shock-aligned grid, the offset from the grid line meant to hold the shock.
 
 The report's columns keep their places whatever the options: x, y, x_wall, y_wall,
 station, j_shock, j_foot, distance, thickness_cells, detected_by, x_smooth, y_smooth,
@@ -187,7 +187,7 @@ indicator_threshold = 0.0025
 # Largest captured shock thickness in cells (10-90 % of the jump); a wider rise is a
 # smooth compression, not a shock. Raise it for solvers that smear the shock more.
 max_thickness = 20.0
-# Shock-line grids: the grid line meant to hold the shock (grid-generator's shock_line_j);
+# Shock-aligned grids: the grid line meant to hold the shock (grid-generator's shock_line_j);
 # uncomment to compare with it, if the solution file doesn't carry it as an attribute.
 # shock_line_j = 160
 # Smoothing of the curve that is written (it becomes a grid line): each point moves, along

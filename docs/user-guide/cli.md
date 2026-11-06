@@ -16,7 +16,7 @@ flow-props <calculation> examples   # bundled cases (calculations that ship some
 | `bl` | boundary-layer edge $\delta$, $\delta^*$, $\theta$, $H$ and edge state per station | `bl.toml` |
 | `entropy-layer` | entropy-layer thickness per station | `entropy-layer.toml` |
 | `profiles` | wall-normal profiles of every flow variable per station | `profiles.toml` |
-| `shock` | the shock curve, and its offset from a shock-line grid's shock line | `shock.toml` |
+| `shock` | the shock curve, and its offset from a shock-aligned grid's shock line | `shock.toml` |
 
 ## Global Options
 

@@ -59,9 +59,9 @@ of the jump. A rise spread over more than `max_thickness` cells (default 20) is 
 compression, not a shock: for example the pressure rise toward the stagnation point on a
 line that ends inside the shock layer. Such lines are reported as having no shock.
 
-## Comparison with a Shock-Line Grid
+## Comparison with a Shock-Aligned Grid
 
-On a shock-line grid the shock is meant to lie on grid line `shock_line_j`. The report
+On a shock-aligned grid the shock is meant to lie on grid line `shock_line_j`. The report
 gives each line's offset $j_\text{shock} - j_s$ in cells, and the run summary the range of
 offsets and the number of lines more than a quarter cell off.
 
@@ -79,9 +79,9 @@ against the other. The run summary warns when
   only flags sharp jumps, finds the shock.
 
 It also counts how often the shock's outer edge changes grid row along the body and, on
-a shock-line grid, how often it crosses the shock line `shock_line_j`. A captured shock
+a shock-aligned grid, how often it crosses the shock line `shock_line_j`. A captured shock
 that moves between rows makes a solver's wall quantities wave; on a converged
-shock-line grid the edge stays on one side of the shock line.
+shock-aligned grid the edge stays on one side of the shock line.
 
 ## Solutions at Cell Centres
 
@@ -110,7 +110,7 @@ curve that is written is the smoothed one.
 
 The stretch scales with $d$ because the shock bends on scales of $d$: tightly around a
 blunt nose, gently far downstream. A fixed number of grid lines fails one way or the
-other: a precursor grid's lines are dense on the body compared with a shock-line grid's
+other: a precursor grid's lines are dense on the body compared with a shock-aligned grid's
 cells, so a short window leaves wiggles a few millimetres long that the new grid resolves
 (its shock line zig-zags), and a long one flattens the nose.
 
