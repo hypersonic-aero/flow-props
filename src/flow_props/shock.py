@@ -554,7 +554,8 @@ def write_shock_curve(
     if axis_x is not None:
         points = np.vstack([[axis_x, 0.0], points])
 
-    np.savetxt(path, points, delimiter=",", header="x,y", comments="", fmt="%.10e")
+    # (17 significant digits: the curve reads back to the same float64, as flow-theory's)
+    np.savetxt(path, points, delimiter=",", header="x,y", comments="", fmt="%.16e")
 
     return path
 
