@@ -24,6 +24,7 @@ from flow_props.entropy_layer import run_entropy as run_entropy
 from flow_props.profiles import extract_profiles as extract_profiles
 from flow_props.shock import ShockCrossing as ShockCrossing
 from flow_props.shock import ShockExtraction as ShockExtraction
+from flow_props.shock import axis_crossing as axis_crossing
 from flow_props.shock import extract_shock as extract_shock
 from flow_props.shock import find_shock_on_line as find_shock_on_line
 from flow_props.shock import smooth_shock as smooth_shock
@@ -46,6 +47,7 @@ __all__ = [
     "ENTROPY_LAYER_WALL_FRACTION",
     "ShockCrossing",
     "ShockExtraction",
+    "axis_crossing",
     "bl_properties",
     "boundary_layer_edge",
     "boundary_layer_thickness",

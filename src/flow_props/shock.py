@@ -41,6 +41,10 @@ mistaken for the shock (and the detection stops at the first jump from outside a
 Before the curve becomes a grid line it can be smoothed (smooth_shock): each point moves,
 along its own grid line, onto a quadratic fitted, in the shock's own frame, through the
 shock points within a stretch of a given number of local wall-to-shock distances.
+
+A shock symmetric about the axis y = 0 crosses it at right angles, so near it the curve
+is x = a + b y^2 (axis_crossing). A curve from cell values starts half a cell above the
+axis; the written curve can start with the point (a, 0) instead (write_shock_curve).
 """
 
 # --------------------------------------------------
@@ -85,6 +89,9 @@ DETECTED_BY_INDICATOR = 2
 
 # fewest shock points in one smoothing fit (a quadratic through 3 would not smooth)
 MIN_FIT_POINTS = 5
+
+# shock points nearest the axis that x = a + b y^2 is fitted through (axis_crossing)
+AXIS_FIT_POINTS = 5
 
 # scale of the smoothness measure's integer coefficients (a ramp of slope s gives 5040 s^2)
 INDICATOR_SCALE = 5040.0
@@ -517,12 +524,16 @@ def smooth_shock(ds: Dataset, extraction: ShockExtraction, length: float) -> Sho
     return smoothed
 
 
-def write_shock_curve(path: str | Path, extraction: ShockExtraction) -> Path:
+def write_shock_curve(
+    path: str | Path, extraction: ShockExtraction, axis_x: float | None = None
+) -> Path:
     """Write the shock points as an x, y CSV (the curve file grid-generator's [shock] reads).
 
     Args:
         path: Output file (.csv).
-        extraction: Result of extract_shock.
+        extraction: Result of extract_shock (or smooth_shock).
+        axis_x: Where the shock crosses the axis y = 0 (axis_crossing), written as the
+            first point (x = axis_x, y = 0); None writes the shock points only.
 
     Returns:
         Path to the written file.
@@ -538,9 +549,46 @@ def write_shock_curve(path: str | Path, extraction: ShockExtraction) -> Path:
 
     # write: one header line, then x, y per grid line
     points = np.column_stack([extraction.x, extraction.y])
+
+    # the axis point first, so the curve starts on the axis
+    if axis_x is not None:
+        points = np.vstack([[axis_x, 0.0], points])
+
     np.savetxt(path, points, delimiter=",", header="x,y", comments="", fmt="%.10e")
 
     return path
+
+
+def axis_crossing(x: NDArray[np.float64], y: NDArray[np.float64]) -> float:
+    """Where a shock symmetric about y = 0 crosses the axis, from its points nearest to it.
+
+    The shock crosses the axis at right angles, so near it the curve is x = a + b y^2;
+    a is fitted (least squares) through the first AXIS_FIT_POINTS points.
+
+    Args:
+        x: Shock x [m], from the point nearest the axis outward.
+        y: Shock y [m], > 0.
+
+    Returns:
+        a: the x where the shock crosses the axis [m].
+
+    Raises:
+        ValueError: If there are fewer than two points to fit through.
+    """
+
+    # validate inputs
+    n_fit = min(AXIS_FIT_POINTS, x.size)
+    if n_fit < 2:
+        raise ValueError(f"the axis crossing needs at least two shock points, got {x.size}")
+
+    # fit x = a + b y^2 through the points nearest the axis
+    y_fit = y[:n_fit]
+    x_fit = x[:n_fit]
+    matrix = np.column_stack([np.ones(n_fit), y_fit**2])
+    coefficients, *_ = np.linalg.lstsq(matrix, x_fit, rcond=None)
+    axis_x = float(coefficients[0])
+
+    return axis_x
 
 
 # --------------------------------------------------

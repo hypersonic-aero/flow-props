@@ -7,7 +7,12 @@ import numpy as np
 import pytest
 from cfd_io import write_file
 from cfd_io.dataset import Dataset, Field
-from synthetic import boundary_layer_solution, shock_behind_a_bump, shock_solution
+from synthetic import (
+    blunt_nose_shock,
+    boundary_layer_solution,
+    shock_behind_a_bump,
+    shock_solution,
+)
 from typer.testing import CliRunner
 
 from flow_props.calculators import CALCULATORS
@@ -238,12 +243,100 @@ def test_shock_run_names_its_method(method, tmp_path):
     assert result.exit_code == 0, result.output
     assert f"Shock on {j_true.size} of {j_true.size} grid lines" in result.output
     assert f"method {method} (" in result.output
-    report_text = (tmp_path / "shock_report.dat").read_text()
     if method == "hybrid":
         assert "found by the walk on" in result.output
-        assert '"detected_by"' in report_text
+
+    # check: detected_by in every report, holding the method's detector
+    lines = (tmp_path / "shock_report.dat").read_text().splitlines()
+    variables = [name.strip('" ') for name in lines[1].split("=")[1].split(",")]
+    rows = np.loadtxt(lines[3:], ndmin=2)
+    codes = set(rows[:, variables.index("detected_by")].tolist())
+    expected = {"walk": {1.0}, "indicator": {2.0}, "hybrid": {1.0, 2.0, 3.0}}
+    assert codes <= expected[method]
+
+
+def _report_variables(folder: Path) -> list[str]:
+    """Column names of a shock report, in order."""
+    lines = (folder / "shock_report.dat").read_text().splitlines()
+    variables = [name.strip('" ') for name in lines[1].split("=")[1].split(",")]
+    return variables
+
+
+def test_shock_report_columns_keep_their_places_whatever_the_options(tmp_path):
+    """Same columns in the same order for every method and smoothing; offset_cells last."""
+    dataset, _ = shock_solution()
+    _write_solution(tmp_path, dataset)
+
+    # run with different options
+    tables = {
+        "default": "",
+        "walk_raw": '[shock]\nmethod = "walk"\nsmoothing_length = 0\n',
+        "indicator": '[shock]\nmethod = "indicator"\n',
+        "shock_line": "[shock]\nshock_line_j = 55\n",
+    }
+    variables = {}
+    for label, table in tables.items():
+        path = _write_config(tmp_path, "shock", table)
+        result = runner.invoke(app, ["shock", "run", "-c", str(path)])
+        assert result.exit_code == 0, result.output
+        variables[label] = _report_variables(tmp_path)
+
+    # check: one fixed layout, the shock-line offset appended when there is a shock line
+    fixed = [
+        "x", "y", "x_wall", "y_wall", "station", "j_shock", "j_foot", "distance",
+        "thickness_cells", "detected_by", "x_smooth", "y_smooth", "j_smooth",
+        "smoothing_cells",
+    ]  # fmt: skip
+    assert variables["default"] == fixed
+    assert variables["walk_raw"] == fixed
+    assert variables["indicator"] == fixed
+    assert variables["shock_line"] == fixed + ["offset_cells"]
+
+
+def test_shock_method_defaults_to_hybrid():
+    """hybrid catches what the walk alone takes for the shock (a disturbance ahead of it)."""
+    config = CALCULATORS["shock"].config_model.model_validate({"fname": "solution.h5"})
+    assert config.shock.method == "hybrid"
+    assert 'method = "hybrid"' in CALCULATORS["shock"].template
+
+
+@pytest.mark.parametrize("at_cells", [True, False])
+def test_shock_curve_starts_on_the_axis(at_cells, tmp_path, monkeypatch):
+    """From cell values the curve is continued to the axis; from grid points it starts there."""
+    dataset, shock_radius = blunt_nose_shock(at_cells)
+    monkeypatch.setattr("flow_props.calculators.shock.load_dataset", lambda fname, gname: dataset)
+    path = _write_config(tmp_path, "shock", "")
+
+    result = runner.invoke(app, ["shock", "run", "-c", str(path)])
+
+    # check: the first point on the axis, where the shock circle crosses it
+    assert result.exit_code == 0, result.output
+    curve = np.loadtxt(tmp_path / "shock_cfd.csv", delimiter=",", skiprows=1)
+    assert abs(curve[0, 1]) < 1.0e-12
+    assert curve[0, 0] == pytest.approx(-shock_radius, rel=1.0e-3)
+
+    # check: one point per grid line, plus the axis point from cell values
+    n_lines = dataset.flow["pres"].data.shape[0]
+    if at_cells:
+        assert curve.shape[0] == n_lines + 1
+        assert "curve continued to the axis at x = " in result.output
     else:
-        assert '"detected_by"' not in report_text
+        assert curve.shape[0] == n_lines
+        assert "continued to the axis" not in result.output
+
+
+def test_shock_curve_off_a_symmetry_line_is_not_continued(tmp_path, monkeypatch):
+    """Cell values on a grid whose line i = 0 is not on the axis: the curve is left as found."""
+    dataset = _analytic_shock(at_cells=True)
+    monkeypatch.setattr("flow_props.calculators.shock.load_dataset", lambda fname, gname: dataset)
+    path = _write_config(tmp_path, "shock", "")
+
+    result = runner.invoke(app, ["shock", "run", "-c", str(path)])
+
+    assert result.exit_code == 0, result.output
+    curve = np.loadtxt(tmp_path / "shock_cfd.csv", delimiter=",", skiprows=1)
+    assert curve.shape[0] == dataset.flow["pres"].data.shape[0]
+    assert "continued to the axis" not in result.output
 
 
 def _analytic_shock(at_cells: bool, shock_j: float = 50.3) -> Dataset:

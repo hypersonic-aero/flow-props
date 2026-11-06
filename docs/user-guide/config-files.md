@@ -80,7 +80,7 @@ Each calculation has one table named after it:
 	[shock]
 	quantity = "pressure"          # or density
 	level = 0.5                    # middle of the captured jump
-	method = "walk"                # walk, indicator (WENO smoothness indicator) or hybrid
+	method = "hybrid"              # hybrid (both), walk, or indicator (WENO smoothness)
 	min_rise = 0.05                # walk: 5 % above freestream marks the shock
 	indicator_threshold = 0.0025   # indicator: (rise per cell / q_inf)^2 on a ramp
 	max_thickness = 20.0           # wider rises are smooth compressions, not shocks

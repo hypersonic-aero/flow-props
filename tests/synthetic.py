@@ -117,3 +117,53 @@ def shock_behind_a_bump(nj: int = 81) -> np.ndarray:
     bump = 0.18 * 0.5 * (1.0 - np.tanh((j - 75.0) / 2.5))
     values = 1.0 + shock + bump
     return values
+
+
+def blunt_nose_shock(at_cells: bool, ni: int = 31, nj: int = 81) -> tuple[Dataset, float]:
+    """Circular nose symmetric about y = 0, with a circular shock at a known radius.
+
+    The wall is the circle r = 1 mm from the stagnation point (angle 180 deg, on the
+    axis y = 0) a quarter turn up; the j-lines run radially out to r = 2 mm, so grid
+    line i = 0 is the symmetry line on the axis. The pressure jumps (5 x freestream)
+    across the circle r = 1.4 mm, which crosses the axis at x = -1.4 mm.
+
+    Args:
+        at_cells: Pressure at the cell centres (a finite-volume solution's cell values),
+            or at the grid points.
+        ni: Grid lines along the wall.
+        nj: Points per grid line.
+
+    Returns:
+        The dataset, and the shock radius [m].
+    """
+
+    # grid: radial lines from the nose circle, line i = 0 exactly on y = 0
+    wall_radius = 1.0e-3
+    shock_radius = 1.4e-3
+    outer_radius = 2.0e-3
+    theta = np.linspace(np.pi, 0.5 * np.pi, ni)
+    radius = np.linspace(wall_radius, outer_radius, nj)
+    x = radius[None, :] * np.cos(theta)[:, None]
+    y = radius[None, :] * np.sin(theta)[:, None]
+    y[0, :] = 0.0
+
+    # where the pressure sits: the grid points, or the cell centres (mean of the corners)
+    points_x = x
+    points_y = y
+    association = "node"
+    if at_cells:
+        points_x = 0.25 * (x[:-1, :-1] + x[1:, :-1] + x[1:, 1:] + x[:-1, 1:])
+        points_y = 0.25 * (y[:-1, :-1] + y[1:, :-1] + y[1:, 1:] + y[:-1, 1:])
+        association = "cell"
+
+    # pressure: a captured jump across the shock circle, about 3 cells wide
+    cell_size = (outer_radius - wall_radius) / (nj - 1)
+    point_radius = np.hypot(points_x, points_y)
+    shape = 0.5 * (1.0 - np.tanh((point_radius - shock_radius) / (1.5 * cell_size)))
+    pres = FREESTREAM_PRESSURE * (1.0 + 4.0 * shape)
+
+    flow = {"pres": Field(data=pres[:, :, None], association=association)}
+    grid = StructuredGrid(x=x[:, :, None], y=y[:, :, None], z=np.zeros((ni, nj, 1)))
+    dataset = Dataset(grid=grid, flow=flow, attrs={})
+
+    return dataset, shock_radius

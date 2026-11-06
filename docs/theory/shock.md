@@ -11,11 +11,11 @@ post-shock value over a short stretch.
 Walking inward from the line's outer end, where $q_\infty$ is $q$ at the outer end, a
 detector proposes where a jump starts (`method`):
 
-- **walk** (default): the first point where $q > (1 + \text{min\_rise})\, q_\infty$;
+- **walk**: the first point where $q > (1 + \text{min\_rise})\, q_\infty$;
 - **indicator**: the first point whose smoothness indicator reaches
   `indicator_threshold` (see [Smoothness Indicator](#smoothness-indicator));
-- **hybrid**: both detectors, and the outermost jump either finds, since the shock is
-  the first jump from outside. The report says which detector found each line.
+- **hybrid** (default): both detectors, and the outermost jump either finds, since the
+  shock is the first jump from outside. The report says which detector found each line.
 
 From the proposed start, the steepest cell within `max_thickness` cells inward is the
 jump's core. Walking on inward, the rise per cell shrinks across the jump's rounded

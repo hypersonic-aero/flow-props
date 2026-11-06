@@ -10,8 +10,17 @@ finds the shock on every wall-normal grid line (see flow_props.shock) and writes
   with per line the wall point, distance from the wall, captured thickness in cells and,
   on a shock-line grid, the offset from the grid line meant to hold the shock.
 
+The report's columns keep their places whatever the options: x, y, x_wall, y_wall,
+station, j_shock, j_foot, distance, thickness_cells, detected_by, x_smooth, y_smooth,
+j_smooth, smoothing_cells (the curve as written: the points as found when not
+smoothed), then offset_cells, the one column that needs a known shock line. New
+columns go at the end; readers should still go by the VARIABLES names.
+
 A solution with cell values is taken along the lines through the cell centres, whose j
-counts cells; the offsets from shock_line_j (a vertex index) use j + 0.5 for them.
+counts cells; the offsets from shock_line_j (a vertex index) use j + 0.5 for them. On a
+symmetry line (grid line i = 0 on the axis y = 0, ahead of a blunt body), the curve
+from cell values starts half a cell above the axis; it is continued there by symmetry,
+so the curve file starts on the axis.
 
 Detection (``method``): walk (the first rise of min_rise over freestream, from outside),
 indicator (the first point whose WENO smoothness indicator reaches indicator_threshold)
@@ -58,6 +67,10 @@ OUTER_EDGE_CELLS = 5
 # walk and indicator farther apart than this found different things on a line
 DISAGREEMENT_CELLS = 3.0
 
+# grid line i = 0 is a symmetry line on the axis if its |y| is at most this fraction of
+# the grid's largest |y| (round-off)
+AXIS_TOLERANCE = 1.0e-9
+
 # --------------------------------------------------
 # config models (input boundary)
 # --------------------------------------------------
@@ -79,7 +92,7 @@ class ShockConfig(BaseModel):
         description="Where in the jump the shock point sits (0.5 = middle)",
     )
     method: Literal["walk", "indicator", "hybrid"] = Field(
-        default="walk",
+        default="hybrid",
         description="Detection of the jump: threshold walk, smoothness indicator, or both",
     )
     min_rise: float = Field(
@@ -161,8 +174,9 @@ quantity = "pressure"
 level = 0.5
 # Detection of the jump: walk (the first rise of min_rise over freestream), indicator
 # (the first point whose smoothness indicator reaches indicator_threshold) or hybrid
-# (the outermost jump either finds; the report says which one found each line).
-method = "walk"
+# (the outermost jump either finds; the report says which one found each line). hybrid
+# also catches a shock the walk alone misses behind a disturbance ahead of it.
+method = "hybrid"
 # walk: rise over the freestream value that marks the shock (0.05 = 5 % above freestream).
 min_rise = 0.05
 # indicator: smoothness indicator value that marks the shock. The indicator is the central
@@ -185,6 +199,7 @@ smoothing_length = 0.5
 output = "shock_cfd.csv"
 # Tecplot ASCII of the shock location: x, y are the shock points as found (load it over
 # the flow field), with x_smooth, y_smooth and per-line details; one row per grid line.
+# The columns keep their order whatever the options; offset_cells (with a shock line) last.
 report = "shock_report.dat"
 """
 
@@ -214,6 +229,7 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
     from flow_props.shock import (
         DETECTED_BY_INDICATOR,
         DETECTED_BY_WALK,
+        axis_crossing,
         extract_shock,
         smooth_shock,
         write_shock_curve,
@@ -222,7 +238,8 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
     # resolve file paths relative to the config directory, then load the dataset (cell
     # values go on a grid of the cell centres)
     fname, gname = input_paths(cfg, config_dir)
-    ds, location = solution_points(load_dataset(fname, gname))
+    solution = load_dataset(fname, gname)
+    ds, location = solution_points(solution)
     options = cfg.shock
 
     # j on the grid the shock line counts (the vertex grid): cell j lies at j + 0.5
@@ -268,15 +285,9 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
         "j_foot": extraction.j_foot + j_to_vertex,
         "distance": extraction.distance,
         "thickness_cells": extraction.thickness_cells,
+        # 1: walk, 2: indicator, 3: both (which of the method's detectors found it)
+        "detected_by": extraction.detected_by.astype(float),
     }
-    if options.method == "hybrid":
-        # 1: walk, 2: indicator, 3: both
-        table["detected_by"] = extraction.detected_by.astype(float)
-    offsets = None
-    if shock_line_j is not None:
-        # positive: the solution's shock lies outside the grid's shock line
-        offsets = j_shock - shock_line_j
-        table["offset_cells"] = offsets
 
     # smooth: the curve that is written becomes a grid line
     curve = extraction
@@ -284,13 +295,34 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
     if options.smoothing_length > 0.0:
         curve = smooth_shock(ds, extraction, options.smoothing_length)
         moved = curve.j - extraction.j
-        table["x_smooth"] = curve.x
-        table["y_smooth"] = curve.y
-        table["j_smooth"] = curve.j + j_to_vertex
-        table["smoothing_cells"] = moved
+
+    # the curve as written, smoothed or not (then the points as found, moved by 0), so
+    # every column keeps its place whatever the options
+    table["x_smooth"] = curve.x
+    table["y_smooth"] = curve.y
+    table["j_smooth"] = curve.j + j_to_vertex
+    table["smoothing_cells"] = curve.j - extraction.j
+
+    # last: the offset from the grid's shock line, the one column that needs it known
+    # (positive: the solution's shock lies outside the grid's shock line)
+    offsets = None
+    if shock_line_j is not None:
+        offsets = j_shock - shock_line_j
+        table["offset_cells"] = offsets
+
+    # the axis: on a symmetry line (vertex line i = 0 on y = 0, ahead of a blunt body)
+    # the curve from cell values starts half a cell above the axis; a symmetric shock
+    # crosses it at right angles, so the curve is continued there (x = a + b y^2
+    # through its first points) and the file starts on the axis
+    axis_x = None
+    symmetry_y = np.abs(np.asarray(solution.grid.y[0, :, 0], dtype=float))
+    grid_extent = float(np.max(np.abs(solution.grid.y)))
+    on_axis = grid_extent > 0.0 and float(symmetry_y.max()) <= AXIS_TOLERANCE * grid_extent
+    if location == AT_CELL_CENTRES and on_axis and curve.station[0] == 0:
+        axis_x = axis_crossing(curve.x, curve.y)
 
     # write: the curve, then the report
-    curve_path = write_shock_curve(config_dir / options.output, curve)
+    curve_path = write_shock_curve(config_dir / options.output, curve, axis_x)
     report_path = write_tecplot_table(
         config_dir / options.report, table, title="flow-props shock", zone_title="shock"
     )
@@ -390,6 +422,13 @@ def run_case(cfg: ShockCaseConfig, config_dir: Path) -> list[str]:
         report.append(
             f"  smoothed over {options.smoothing_length:g} shock distances: points moved by up to "
             f"{np.abs(moved).max():.2f} cells (rms {rms:.2f})"
+        )
+
+    # report: the curve continued to the axis
+    if axis_x is not None:
+        report.append(
+            f"  curve continued to the axis at x = {axis_x:.6g} m (from cell values it starts "
+            "half a cell above it)"
         )
 
     # report: written files
