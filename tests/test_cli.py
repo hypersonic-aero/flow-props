@@ -18,6 +18,8 @@ from typer.testing import CliRunner
 from flow_props.calculators import CALCULATORS
 from flow_props.calculators.common import load_config
 from flow_props.cli.app import app
+from flow_props.cli.examples_command import list_examples
+from flow_props.output import BL_PROPERTIES_COLUMNS
 
 runner = CliRunner()
 
@@ -463,30 +465,87 @@ def test_examples_lists_available(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["bl", "examples"])
     assert result.exit_code == 0
-    assert "sharp_flat_plate_m5" in result.output
-    assert "ogive_m5pt3" in result.output
-    assert "cone_7deg_m14" in result.output
+    assert "flat_plate_m5" in result.output
 
 
-def test_examples_copies_the_config_under_runs_default_name(tmp_path, monkeypatch):
+def test_examples_copies_the_case_under_runs_default_name(tmp_path, monkeypatch):
+    """The example lands with every file it needs: the config and the flow."""
     monkeypatch.chdir(tmp_path)
-    result = runner.invoke(app, ["bl", "examples", "sharp_flat_plate_m5"])
+    result = runner.invoke(app, ["bl", "examples", "flat_plate_m5"])
     assert result.exit_code == 0
 
     config_text = Path("bl.toml").read_text()
     assert "[stations]" in config_text
     assert "[bl]" in config_text
+    assert Path("flow.h5").is_file()
 
 
 def test_examples_refuses_to_overwrite(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    assert runner.invoke(app, ["bl", "examples", "ogive_m5pt3"]).exit_code == 0
+    assert runner.invoke(app, ["bl", "examples", "flat_plate_m5"]).exit_code == 0
 
-    result = runner.invoke(app, ["bl", "examples", "ogive_m5pt3"])
+    result = runner.invoke(app, ["bl", "examples", "flat_plate_m5"])
     assert result.exit_code == 1
-    assert "would overwrite bl.toml" in result.output
+    assert "would overwrite" in result.output
+    assert "bl.toml" in result.output
 
-    assert runner.invoke(app, ["bl", "examples", "ogive_m5pt3", "--force"]).exit_code == 0
+    assert runner.invoke(app, ["bl", "examples", "flat_plate_m5", "--force"]).exit_code == 0
+
+
+# every example of every calculation, as (calculation, example name)
+ALL_EXAMPLES = [
+    (calculation, example) for calculation in CALCULATORS for example in list_examples(calculation)
+]
+
+
+@pytest.mark.parametrize(("calculation", "example"), ALL_EXAMPLES)
+def test_every_example_copies_and_runs(tmp_path, monkeypatch, calculation, example):
+    """Each example runs where it lands, with run's default config, and writes its output."""
+
+    # copy, then run with the default config name
+    monkeypatch.chdir(tmp_path)
+    copy_result = runner.invoke(app, [calculation, "examples", example])
+    run_result = runner.invoke(app, [calculation, "run"])
+
+    # check
+    assert copy_result.exit_code == 0, copy_result.output
+    assert run_result.exit_code == 0, run_result.output
+    assert "Wrote: " in run_result.output
+
+
+def test_flat_plate_m5_example_matches_the_simbl_solution(tmp_path, monkeypatch):
+    """bl on the Mach 5 flat plate gives the thicknesses of the simbl solution it was made from.
+
+    The references are simbl's similarity solution integrated on its own 500-point profile
+    from the wall to delta_99, in units of x / sqrt(Re_x). The allowances cover the grid
+    (40 to 57 points inside delta): 0.5 % on delta, whose 0.99 crossing is interpolated
+    linearly between grid points, 0.2 % on delta* and theta, 0.1 % on H.
+    """
+
+    # copy and run the example
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["bl", "examples", "flat_plate_m5"])
+    run_result = runner.invoke(app, ["bl", "run"])
+    assert run_result.exit_code == 0, run_result.output
+
+    # read the property table: numeric rows, in BL_PROPERTIES_COLUMNS order
+    numeric_lines = []
+    for line in Path("bl_properties.dat").read_text().splitlines():
+        stripped = line.strip()
+        if stripped and stripped[0] in "0123456789+-.":
+            numeric_lines.append(stripped)
+    table = np.loadtxt(numeric_lines, ndmin=2)
+    column = {name: index for index, name in enumerate(BL_PROPERTIES_COLUMNS)}
+
+    # scale: x / sqrt(Re_x) with the example's unit Reynolds number Re1 = 1e7 1/m
+    x = table[:, column["x"]]
+    scale = x / np.sqrt(1.0e7 * x)
+
+    # check: simbl across the layer
+    np.testing.assert_allclose(table[:, column["delta"]] / scale, 13.909, rtol=5e-3)
+    np.testing.assert_allclose(table[:, column["delta_star"]] / scale, 10.702, rtol=2e-3)
+    np.testing.assert_allclose(table[:, column["theta"]] / scale, 0.64308, rtol=2e-3)
+    np.testing.assert_allclose(table[:, column["H"]], 16.642, rtol=1e-3)
 
 
 def test_examples_unknown_name_errors(tmp_path, monkeypatch):

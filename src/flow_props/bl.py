@@ -321,6 +321,10 @@ def bl_properties(
 ) -> dict[str, float]:
     """Compute standard boundary layer integral properties for one profile.
 
+    ``delta_star`` and ``theta`` are integrated from the wall to ``delta`` itself (the
+    profile is cut there, with an end point interpolated at ``delta``), not over the
+    whole profile.
+
     Args:
         eta: Wall-normal distance array.
         u: Velocity profile.
@@ -352,9 +356,14 @@ def bl_properties(
         gas_constant=gas_constant,
     )
 
+    # integrate across the boundary layer only (0 to delta): integrating over the full
+    # grid line accumulates spurious freestream contributions over the large inviscid
+    # extent and can flip the sign
+    eta_bl, rho_bl, u_bl = _cut_at_edge(eta, rho, u, delta)
+
     # build integral thickness values
-    delta_star = displacement_thickness(eta, rho, u, rho_edge, u_edge)
-    theta = momentum_thickness(eta, rho, u, rho_edge, u_edge)
+    delta_star = displacement_thickness(eta_bl, rho_bl, u_bl, rho_edge, u_edge)
+    theta = momentum_thickness(eta_bl, rho_bl, u_bl, rho_edge, u_edge)
     h_shape = shape_factor(delta_star, theta)
 
     result = {
@@ -449,6 +458,45 @@ def run_bl(
 # --------------------------------------------------
 # helpers
 # --------------------------------------------------
+
+
+def _cut_at_edge(
+    eta: np.ndarray,
+    rho: np.ndarray,
+    u: np.ndarray,
+    delta: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The profile from the wall to delta, ending with a point at delta itself.
+
+    The grid points below delta are kept and one point at delta is added, its density
+    and velocity interpolated linearly between the grid points around it. Stopping at
+    the last grid point below delta would leave the integrals short by up to one grid
+    spacing times the integrand there (about 1 % on a grid with 40 points across the
+    layer).
+
+    Args:
+        eta: Wall-normal distance array, increasing from the wall.
+        rho: Density profile.
+        u: Velocity profile.
+        delta: Boundary layer thickness, within the range of ``eta``.
+
+    Returns:
+        ``eta``, ``rho`` and ``u`` from the wall to delta.
+    """
+
+    # the grid points below delta
+    below = eta < delta
+
+    # the end point at delta, interpolated between the grid points around it
+    rho_at_delta = float(np.interp(delta, eta, rho))
+    u_at_delta = float(np.interp(delta, eta, u))
+
+    # join them
+    eta_bl = np.append(eta[below], delta)
+    rho_bl = np.append(rho[below], rho_at_delta)
+    u_bl = np.append(u[below], u_at_delta)
+
+    return eta_bl, rho_bl, u_bl
 
 
 def _find_first_crossing(

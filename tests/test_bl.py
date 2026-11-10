@@ -283,6 +283,22 @@ def test_bl_properties_returns_all_keys():
     assert result["H"] == pytest.approx(result["delta_star"] / result["theta"])
 
 
+def test_bl_properties_integrates_up_to_delta_itself():
+    """A linear profile on a coarse grid: delta = 0.99 lies between grid points, and the
+    displacement thickness is the exact integral of 1 - u from 0 to 0.99, with nothing
+    from the profile beyond delta."""
+
+    # u = eta up to 1, then freestream out to 3, on steps of 0.1
+    eta = np.linspace(0.0, 3.0, 31)
+    u = np.minimum(eta, 1.0)
+    rho = np.ones_like(eta)
+    result = bl_properties(eta, u, rho, u_edge=1.0, rho_edge=1.0)
+
+    # check: delta interpolated, delta* exact (trapezoid on a linear integrand)
+    assert result["delta"] == pytest.approx(0.99, rel=1e-12)
+    assert result["delta_star"] == pytest.approx(0.99 - 0.99**2 / 2.0, rel=1e-12)
+
+
 def test_run_bl_accepts_dens_field_name():
     ds = _make_run_bl_dataset()
     result = run_bl(ds, stations=[2], threshold=0.99)

@@ -52,7 +52,7 @@ Bad input (a misspelled key, a missing solution file, a missing field) is report
 
 ```bash
 flow-props bl examples                       # list the bundled cases
-flow-props bl examples sharp_flat_plate_m5   # copy its files here (as bl.toml)
+flow-props bl examples flat_plate_m5         # copy its files here (bl.toml, flow.h5)
 flow-props bl run
 ```
 

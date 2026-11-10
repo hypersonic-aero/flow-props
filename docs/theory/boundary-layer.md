@@ -39,7 +39,7 @@ The third option identifies the edge where the wall-normal velocity gradient fal
 The compressible displacement thickness is:
 
 $$
-\delta^* = \int \left(1 - \frac{\rho u}{\rho_e u_e}\right) d\eta
+\delta^* = \int_0^{\delta} \left(1 - \frac{\rho u}{\rho_e u_e}\right) d\eta
 $$
 
 ## Momentum Thickness
@@ -47,8 +47,13 @@ $$
 The compressible momentum thickness is:
 
 $$
-\theta = \int \frac{\rho u}{\rho_e u_e}\left(1 - \frac{u}{u_e}\right)d\eta
+\theta = \int_0^{\delta} \frac{\rho u}{\rho_e u_e}\left(1 - \frac{u}{u_e}\right)d\eta
 $$
+
+Both integrals run from the wall to the edge $\delta$ found by the selected criterion;
+beyond it the integrands carry only freestream noise. On a grid, the profile is cut at
+$\delta$ with an end point interpolated there, so the integrals do not depend on where
+$\delta$ falls between two grid points.
 
 ## Shape Factor
 

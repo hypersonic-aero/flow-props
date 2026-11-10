@@ -175,12 +175,7 @@ def _compute_bl_table(
     Returns:
         Dict mapping each output column name to a 1-D array over stations.
     """
-    from flow_props.bl import (
-        boundary_layer_edge,
-        displacement_thickness,
-        momentum_thickness,
-        shape_factor,
-    )
+    from flow_props.bl import bl_properties
 
     # accumulate one value per station for every output column
     columns: dict[str, list[float]] = {
@@ -212,40 +207,30 @@ def _compute_bl_table(
         dens_edge = float(rho[-1])
         mach_edge = float(mach[-1]) if mach is not None else float("nan")
 
-        # boundary-layer edge thickness from the configured criterion
-        delta = boundary_layer_edge(
+        # boundary-layer edge thickness from the configured criterion, and the
+        # compressible integral thicknesses and shape factor across the boundary layer
+        # only (0 to delta; bl_properties cuts the profile there)
+        props = bl_properties(
             eta,
             u,
-            criterion=bl_cfg.criterion,
+            rho,
+            u_edge,
+            dens_edge,
             threshold=bl_cfg.threshold,
-            u_edge=u_edge,
+            criterion=bl_cfg.criterion,
             temp=temp,
             gamma=gamma,
             gas_constant=gas_constant,
         )
 
-        # integrate integral thicknesses across the boundary layer only (0 to delta);
-        # integrating over the full grid line accumulates spurious freestream
-        # contributions over the large inviscid extent and can flip the sign.
-        mask = eta <= delta
-        if int(np.count_nonzero(mask)) < 2:
-            mask = np.zeros_like(eta, dtype=bool)
-            mask[:2] = True
-        eta_bl, rho_bl, u_bl = eta[mask], rho[mask], u[mask]
-
-        # compressible integral thicknesses and shape factor
-        delta_star = displacement_thickness(eta_bl, rho_bl, u_bl, dens_edge, u_edge)
-        theta = momentum_thickness(eta_bl, rho_bl, u_bl, dens_edge, u_edge)
-        h_shape = shape_factor(delta_star, theta)
-
         # wall-to-edge temperature ratio from the first profile point
         twte = float(temp[0]) / temp_edge if temp_edge != 0.0 else float("nan")
 
         columns["x"].append(float(np.asarray(profile["x"]).flat[0]))
-        columns["delta"].append(delta)
-        columns["delta_star"].append(delta_star)
-        columns["theta"].append(theta)
-        columns["H"].append(h_shape)
+        columns["delta"].append(props["delta"])
+        columns["delta_star"].append(props["delta_star"])
+        columns["theta"].append(props["theta"])
+        columns["H"].append(props["H"])
         columns["uvel_edge"].append(u_edge)
         columns["temp_edge"].append(temp_edge)
         columns["dens_edge"].append(dens_edge)

@@ -1,0 +1,37 @@
+# Mach 5 flat plate: laminar boundary layer at T_e = 68 K over an isothermal wall at 300 K
+#
+# flow.h5: simbl's similarity solution (similarity-bl; Falkner-Skan with beta = 0,
+#   Sutherland viscosity, Pr = 0.71) for M_e = 5, T_e = 68 K, Re1 = 1e7 1/m
+#   (p_e = 1082 Pa, u_e = 826.7 m/s), mapped with `simbl baseflow run` onto a
+#   10 x 81 grid: x = 0.05 to 0.5 m, y = 0 to 8 mm, clustered toward the wall
+# Reference: the same simbl solution on its own 500-point profile. In units of
+#   x / sqrt(Re_x), with Re_x = Re1 x and the integrals taken from the wall to delta_99:
+#   delta = 13.91, delta* = 10.70, theta = 0.6431, H = 16.64
+# run: flow-props bl run
+
+# Solution file: grid and flow in one HDF5 file (relative to this file).
+fname = "flow.h5"
+
+# Stations: wall x from x_s to x_e in steps of dx.
+[stations]
+# Start x [m].
+x_s = 0.1
+# End x [m].
+x_e = 0.5
+# Spacing between requested x-coordinates [m].
+dx = 0.1
+
+[bl]
+# Edge criterion: velocity_ratio or htot_derivative.
+criterion = "velocity_ratio"
+# Fraction of edge velocity for velocity_ratio (99 % gives delta_99).
+threshold = 0.99
+# Tecplot ASCII BL property table (relative to this file).
+output = "bl_properties.dat"
+
+# Gas (the flow file carries no gas constants).
+[gas]
+# Specific heat ratio.
+gamma = 1.4
+# Specific gas constant [J/(kg K)].
+gas_constant = 287.15
