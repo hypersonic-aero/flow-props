@@ -15,7 +15,7 @@ pip install --upgrade flow-props
 ## From Source
 
 ```bash
-git clone https://github.com/uahypersonics/flow-props.git
+git clone https://github.com/hypersonic-aero/flow-props.git
 cd flow-props
 pip install -e .
 ```

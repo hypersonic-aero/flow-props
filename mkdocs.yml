@@ -4,15 +4,15 @@
 # site metadata
 # --------------------------------------------------
 site_name: flow_props
-site_url: https://uahypersonics.github.io/flow-props
+site_url: https://hypersonic-aero.github.io/flow-props
 site_author: Christoph Hader
 site_description: Extract flow properties from CFD data.
 
 # --------------------------------------------------
 # github repository (adds link in top right corner)
 # --------------------------------------------------
-repo_name: uahypersonics/flow-props
-repo_url: https://github.com/uahypersonics/flow-props
+repo_name: hypersonic-aero/flow-props
+repo_url: https://github.com/hypersonic-aero/flow-props
 edit_uri: edit/main/docs/
 
 # --------------------------------------------------

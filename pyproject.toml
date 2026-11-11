@@ -44,8 +44,8 @@ dev = [
 flow-props = "flow_props.cli.app:app"
 
 [project.urls]
-Homepage = "https://github.com/uahypersonics/flow-props"
-Repository = "https://github.com/uahypersonics/flow-props"
+Homepage = "https://github.com/hypersonic-aero/flow-props"
+Repository = "https://github.com/hypersonic-aero/flow-props"
 
 [tool.setuptools.packages.find]
 where = ["src"]

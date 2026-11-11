@@ -7,7 +7,7 @@ authors:
   - family-names: "Hader"
     given-names: "Christoph"
     orcid: "https://orcid.org/0000-0002-0956-000X"
-repository-code: "https://github.com/uahypersonics/flow-props"
+repository-code: "https://github.com/hypersonic-aero/flow-props"
 license: GPL-3.0-or-later
 keywords:
   - computational fluid dynamics

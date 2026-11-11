@@ -2,9 +2,9 @@
 
 Python tool suite to extract flow properties from CFD data, such as boundary layer thickness, entropy layer thickness and the shock.
 
-[![Test](https://github.com/uahypersonics/flow-props/actions/workflows/test.yml/badge.svg)](https://github.com/uahypersonics/flow-props/actions/workflows/test.yml)
+[![Test](https://github.com/hypersonic-aero/flow-props/actions/workflows/test.yml/badge.svg)](https://github.com/hypersonic-aero/flow-props/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/flow-props)](https://pypi.org/project/flow-props/)
-[![Docs](https://img.shields.io/badge/docs-zensical-blue)](https://uahypersonics.github.io/flow-props/)
+[![Docs](https://img.shields.io/badge/docs-zensical-blue)](https://hypersonic-aero.github.io/flow-props/)
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-≥3.11-blue.svg)](https://www.python.org/downloads/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -36,7 +36,7 @@ flow-props shock run
 
 ## Documentation
 
-Full documentation: https://uahypersonics.github.io/flow-props
+Full documentation: https://hypersonic-aero.github.io/flow-props
 
 ## Testing
 
@@ -49,7 +49,7 @@ pytest --cov
 
 ## Documentation
 
-Full documentation: https://uahypersonics.github.io/flow-props
+Full documentation: https://hypersonic-aero.github.io/flow-props
 
 ## Code Style
 

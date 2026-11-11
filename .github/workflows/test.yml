@@ -41,5 +41,5 @@ jobs:
         with:
           files: coverage.xml
           token: "${{ secrets.CODECOV_TOKEN }}"
-          slug: uahypersonics/flow-props
+          slug: hypersonic-aero/flow-props
           fail_ci_if_error: false
